@@ -1,0 +1,44 @@
+[user]
+	name = Marco Fugaro
+	email = marco.fugaro@gmail.com
+	
+[core]
+	# set global gitignore
+	excludesfile = ~/.gitignore
+	# set standard editor
+	editor = vim
+
+[alias]	
+	# better git log
+	hist = log --pretty=format:'%h %s%d - %ar [%an]' --graph
+	# delete all local branches thet have been merged except master and dev
+	purge = !"git branch --merged | grep -Ev '\\*|master|dev' | xargs -n 1 git branch -d"
+	# undo your last commit and stage the changes
+	undo = reset --soft HEAD^
+	
+# always push only current branch
+[push]
+	default = current
+	
+# autocorrect the mispelled commands
+[help]
+	autocorrect = -1
+	
+# enable git rerere for auto conflict resolution
+[rerere]
+	enabled = 1
+	autoupdate = 1
+	
+# set chrome as default browser
+[web]
+	browser = google-chrome
+	
+[merge]
+	# set meld as default mergetool
+	tool = meld
+	# show the common ancestor in merge conflicts
+	conflictStyle = diff3
+	
+# comfigure meld's ui arrangement
+[mergetool "meld"]
+	cmd = meld "$LOCAL" "$MERGED" "$REMOTE" --output "$MERGED"
