@@ -13,7 +13,6 @@ read -p "Press any key to continue. Ctrl-C to abort."
 
 # Install GNU core utilities (those that come with macOS are outdated)
 brew install coreutils
-PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
 
 # Install more recent versions of some macOS tools.
 brew install vim grep openssh screen python git bash bash-completion2
@@ -22,7 +21,7 @@ brew install vim grep openssh screen python git bash bash-completion2
 brew install cask node yarn tldr thefuck diff-so-fancy httpie tree
 
 # Install npm global commands
-npm install --global fkill-cli speed-test glob-cmd
+npm install --global fkill-cli speed-test glob-cmd trash-cli
 
 # Install applications
 brew tap homebrew/cask-versions

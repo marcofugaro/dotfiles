@@ -36,3 +36,6 @@ shopt -s globstar 2> /dev/null
 # start thefuck
 # https://github.com/nvbn/thefuck
 eval $(thefuck --alias)
+
+# add to the path the GNU core utilities
+PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
