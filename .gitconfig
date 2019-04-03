@@ -13,23 +13,32 @@
 	superlog = log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all
 
 	# delete all local branches thet have been merged except master and dev
-	purge = !"git branch --merged | grep -Ev '\\*|master|dev' | xargs -n 1 git branch -d"
+	purge = "!git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d"
+
 	# undo your last commit and stage the changes
 	undo = reset --soft HEAD^
 
-# always push only current branch
+	# show verbose output about tags, branches or remotes
+	tags = tag -l
+	branches = branch -a
+	remotes = remote -v
+
 [push]
+	# always push only current branch
 	default = current
 
-# autocorrect the mispelled commands
+	# make `git push` push relevant annotated tags when pushing branches out
+	followTags = true
+
 [help]
+	# autocorrect the mispelled commands
 	autocorrect = -1
 
-# enable git rerere for auto conflict resolution
 [rerere]
+	# enable git rerere for auto conflict resolution
 	enabled = 1
 	autoupdate = 1
 
-# set chrome as default browser
 [web]
+	# set chrome as default browser
 	browser = google-chrome
