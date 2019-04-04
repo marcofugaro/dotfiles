@@ -32,3 +32,10 @@ echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
 
 # Set MacOS defaults
 ./macos.sh
+
+# Copy dotfiles over
+cp ./.bash_profile ~
+cp ./.bash_prompt ~
+cp ./.inputrc ~
+cp ./.gitignore ~
+cp ./.gitconfig ~

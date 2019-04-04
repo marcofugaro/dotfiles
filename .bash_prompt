@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# shell prompt inspired from Pure https://github.com/sindresorhus/pure
+# screenshot http://i.imgur.com/EkEtphC.png
+
+prompt_git() {
+	local dirty=""
+	local branchName=""
+
+	# Check if the current directory is in a Git repository.
+	if [ $(git rev-parse --is-inside-work-tree &>/dev/null; echo "${?}") == '0' ]; then
+
+		# check if the current directory is in .git before running git checks
+		if [ "$(git rev-parse --is-inside-git-dir 2> /dev/null)" == 'false' ]; then
+			# Ensure the index is up to date.
+			git update-index --really-refresh -q &>/dev/null;
+
+			# Check for uncommitted changes, unstaged changes, and untracked files
+			if [ -n "$(git status --porcelain --ignore-submodules -unormal)" ]; then
+				dirty="*"
+			fi
+		fi
+
+		# Get the short symbolic ref.
+		# If HEAD isn’t a symbolic ref, get the short SHA for the latest commit
+		# Otherwise, just give up.
+		branchName="$(git symbolic-ref --quiet --short HEAD 2> /dev/null || \
+			git rev-parse --short HEAD 2> /dev/null || \
+			echo '(unknown)')"
+
+		echo -e "${branchName}${dirty} "
+	else
+		return
+	fi
+}
+
+# Show the # when logged in as root.
+if [[ "${USER}" == "root" ]]; then
+	character="#"
+else
+	character="$"
+fi
+
+# Highlight the hostname when connected via SSH.
+# if [[ "${SSH_TTY}" ]]; then
+
+# else
+
+# fi
+
+dim="\e[2m"
+reset_dim="\e[22m"
+
+export PS1="\w \[${dim}\]\$(prompt_git)\[${reset_dim}\]${character} "

@@ -13,6 +13,9 @@ alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup
 # tree command preset
 alias tre='tree --du -ahC -I ".git|node_modules" --dirsfirst'
 
+# Enable aliases to be sudo’ed
+alias sudo='sudo '
+
 # intuitive map function
 # for example, to list all directories that contain a certain file:
 # find . -name .gitattributes | map dirname
@@ -39,3 +42,6 @@ eval $(thefuck --alias)
 
 # add to the path the GNU core utilities
 PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
+
+# init the bash prompt
+source ~/.bash_prompt
