@@ -45,3 +45,10 @@ PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
 
 # init the bash prompt
 source ~/.bash_prompt
+
+# set the tab title as the current path
+set_tab_title() {
+	local pwd_home="${PWD/#$HOME/~}"
+	echo -en "\033]0;$pwd_home\a"
+}
+PROMPT_COMMAND="set_tab_title"
