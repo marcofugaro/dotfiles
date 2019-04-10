@@ -1,44 +1,64 @@
 [user]
-	name = Marco Fugaro
-	email = marco.fugaro@gmail.com
+  name = Marco Fugaro
+  email = marco.fugaro@gmail.com
 
 [core]
-	# set global gitignore
-	excludesfile = ~/.gitignore
-	# set standard editor
-	editor = vim
-
+  # set global gitignore
+  excludesfile = ~/.gitignore
+  # set standard editor
+  editor = vim
+  # setup diff-so-fancy
+  pager = diff-so-fancy | less --tabs=4 -RFX
+  # make git ignore the case of the file
+  ignorecase = true
 [alias]
-	# better git log
-	superlog = log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all
+  # better git log
+  superlog = log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all
 
-	# delete all local branches thet have been merged except master and dev
-	purge = "!git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d"
+  # undo your last commit and stage the changes
+  undo = reset --soft HEAD^
 
-	# undo your last commit and stage the changes
-	undo = reset --soft HEAD^
+  # show verbose output about tags, branches or remotes
+  tags = tag -l
+  branches = branch -a
+  remotes = remote -v
 
-	# show verbose output about tags, branches or remotes
-	tags = tag -l
-	branches = branch -a
-	remotes = remote -v
+  # make git git work
+  git = !exec git
+
+  # print the current branch
+  current-branch = rev-parse --abbrev-ref HEAD
+
+  # undo your last push
+  # TODO test this, maybe HEAD must be a branch name
+  undo-push = push -f origin HEAD^:HEAD
+
+  purge = !git branch --merged master --format='%(refname:lstrip=2)' | grep -v 'master' | xargs -n 1 git branch -d
 
 [push]
-	# always push only current branch
-	default = current
+  # always push only current branch
+  default = current
 
-	# make `git push` push relevant annotated tags when pushing branches out
-	followTags = true
+  # make `git push` push relevant annotated tags when pushing branches out
+  followTags = true
+
+[pull]
+  # automatically rebase instead of merging when you pull
+  rebase = true
+
+[fetch]
+  # automatically delete local branches that have been deleted in remote
+  prune = true
 
 [help]
-	# autocorrect the mispelled commands
-	autocorrect = -1
+  # autocorrect the mispelled commands
+  autocorrect = -1
 
 [rerere]
-	# enable git rerere for auto conflict resolution
-	enabled = 1
-	autoupdate = 1
+  # enable git rerere for auto conflict resolution
+  enabled = 1
+  autoupdate = 1
 
 [web]
-	# set chrome as default browser
-	browser = google-chrome
+  # set chrome as default browser
+  browser = google-chrome

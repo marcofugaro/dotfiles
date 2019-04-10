@@ -41,6 +41,7 @@ else
 	character="$"
 fi
 
+# TODO handle ssh?
 # Highlight the hostname when connected via SSH.
 # if [[ "${SSH_TTY}" ]]; then
 

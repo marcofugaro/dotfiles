@@ -18,7 +18,10 @@ brew install coreutils
 brew install vim grep openssh screen python git bash bash-completion2
 
 # Install commands
-brew install cask node yarn tldr thefuck diff-so-fancy httpie tree
+brew install cask node yarn tldr thefuck diff-so-fancy httpie tree hub
+
+# Install quuick-look-plugins
+brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo
 
 # Install npm global commands
 npm install --global fkill-cli speed-test glob-cmd trash-cli
@@ -33,9 +36,12 @@ echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
 # Set MacOS defaults
 ./macos.sh
 
+# Set up Spectacle.app keyboard shortcuts
+cp spectacle.json ~/Library/Application\ Support/Spectacle/Shortcuts.json
+
 # Copy dotfiles over
-cp ./.bash_profile ~
-cp ./.bash_prompt ~
-cp ./.inputrc ~
-cp ./.gitignore ~
-cp ./.gitconfig ~
+cp .bash_profile ~
+cp .bash_prompt ~
+cp .inputrc ~
+cp .gitignore ~
+cp .gitconfig ~
