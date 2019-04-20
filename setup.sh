@@ -8,6 +8,9 @@ pbcopy < ~/.ssh/id_rsa.pub
 echo "Now login to https://github.com/settings/keys and add the key that has already been copied to your clipboard."
 read -p "Press any key to continue. Ctrl-C to abort."
 
+# Install xcode
+xcode-select --install
+
 # Install brew
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
@@ -18,7 +21,7 @@ brew install coreutils
 brew install vim grep openssh screen python git bash bash-completion2
 
 # Install commands
-brew install cask node yarn tldr thefuck diff-so-fancy httpie tree hub
+brew install cask node yarn yarn-completion tldr thefuck diff-so-fancy httpie tree hub
 
 # Install quuick-look-plugins
 brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo
