@@ -8,7 +8,7 @@ alias gti='git'
 alias chrome='open -a "Google Chrome"'
 
 # update everything
-alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm install npm -g; npm update -g'
+alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm update -g'
 
 # tree command preset
 alias tre='tree --du -ahC -I ".git|node_modules" --dirsfirst'

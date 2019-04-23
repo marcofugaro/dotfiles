@@ -31,7 +31,7 @@ npm install --global fkill-cli speed-test glob-cmd trash-cli
 
 # Install applications
 brew tap homebrew/cask-versions
-brew cask install google-chrome google-chrome-canary firefox firefox-nightly slack hyper-canary tableplus visual-studio-code sublime-text alfred spectacle aerial kap spotify vlc table-tool google-drive-file-stream
+brew cask install google-chrome google-chrome-canary firefox firefox-nightly slack hyper-canary tableplus visual-studio-code sublime-text alfred spectacle aerial kap spotify vlc table-tool google-drive-file-stream webtorrent-cli
 
 # Remove password from sudo
 echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
@@ -48,3 +48,7 @@ cp .bash_prompt ~
 cp .inputrc ~
 cp .gitignore ~
 cp .gitconfig ~
+cp .hyper-postprocessing.js ~
+
+# Install fonts
+cp ProFontWindows.ttf ~/Library/Fonts
