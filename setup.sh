@@ -8,6 +8,9 @@ pbcopy < ~/.ssh/id_rsa.pub
 echo "Now login to https://github.com/settings/keys and add the key that has already been copied to your clipboard."
 read -p "Press any key to continue. Ctrl-C to abort."
 
+# Remove password from sudo
+echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
+
 # Install xcode
 xcode-select --install
 
@@ -27,14 +30,11 @@ brew install cask node yarn yarn-completion tldr thefuck diff-so-fancy httpie tr
 brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo
 
 # Install npm global commands
-npm install --global fkill-cli speed-test glob-cmd trash-cli
+npm install --global fkill-cli speed-test glob-cmd trash-cli yo
 
 # Install applications
 brew tap homebrew/cask-versions
 brew cask install google-chrome google-chrome-canary firefox firefox-nightly slack hyper-canary tableplus visual-studio-code sublime-text alfred spectacle aerial kap spotify vlc table-tool google-drive-file-stream webtorrent-cli
-
-# Remove password from sudo
-echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
 
 # Set MacOS defaults
 ./macos.sh
