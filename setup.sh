@@ -24,7 +24,7 @@ brew install coreutils
 brew install vim grep openssh screen python git bash bash-completion2
 
 # Install commands
-brew install cask node yarn yarn-completion tldr thefuck diff-so-fancy httpie tree hub
+brew install cask node yarn yarn-completion tldr thefuck diff-so-fancy httpie tree hub youtube-dl ffmpeg
 
 # Install quuick-look-plugins
 brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo

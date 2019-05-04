@@ -13,13 +13,16 @@ alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup
 # tree command preset
 alias tre='tree --du -ahC -I ".git|node_modules" --dirsfirst'
 
-# Enable aliases to be sudo’ed
+# enable aliases to be sudo’ed
 alias sudo='sudo '
 
 # intuitive map function
 # for example, to list all directories that contain a certain file:
 # find . -name .gitattributes | map dirname
 alias map='xargs -n1'
+
+# shorter youtube-dl command to download audio only
+alias youtube-dl-mp3='youtube-dl --extract-audio --audio-format=mp3'
 
 # case-insensitive globbing (used in pathname expansion)
 shopt -s nocaseglob
