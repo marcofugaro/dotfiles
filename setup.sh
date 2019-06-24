@@ -30,11 +30,11 @@ brew install cask node yarn yarn-completion tldr thefuck diff-so-fancy httpie tr
 brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo
 
 # Install npm global commands
-npm install --global fkill-cli speed-test glob-cmd trash-cli yo
+npm install --global fkill-cli speed-test glob-cmd trash-cli yo gsx-pdf-optimize
 
 # Install applications
 brew tap homebrew/cask-versions
-brew cask install google-chrome google-chrome-canary firefox firefox-nightly slack hyper-canary tableplus visual-studio-code sublime-text alfred spectacle aerial kap spotify vlc table-tool google-drive-file-stream webtorrent-cli
+brew cask install google-chrome google-chrome-canary firefox firefox-nightly slack hyper-canary tableplus visual-studio-code sublime-text alfred spectacle aerial kap spotify vlc table-tool google-drive-file-stream webtorrent-cli android-file-transfer
 
 # Set MacOS defaults
 ./macos.sh
