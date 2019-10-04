@@ -27,7 +27,7 @@ brew install vim grep openssh screen python git bash bash-completion2
 brew install cask node yarn yarn-completion tldr thefuck diff-so-fancy httpie tree hub youtube-dl ffmpeg
 
 # Install quuick-look-plugins
-brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo
+brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo table-tool
 
 # Install npm global commands
 npm install --global fkill-cli speed-test glob-cmd trash-cli yo gsx-pdf-optimize

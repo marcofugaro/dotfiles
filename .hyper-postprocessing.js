@@ -84,16 +84,16 @@ class Sampling extends Effect {
 module.exports = ({ hyperTerm, xTerm }) => {
   const effects = []
 
-  const bloom = new BloomEffect({
-    kernelSize: KernelSize.LARGE,
-    distinction: 1,
-    blendFunction: BlendFunction.ADD,
-  })
-  // bloom.blendMode.opacity.value =
-  effects.push(bloom)
+  // const bloom = new BloomEffect({
+  //   kernelSize: KernelSize.LARGE,
+  //   distinction: 1,
+  //   blendFunction: BlendFunction.ADD,
+  // })
+  // // bloom.blendMode.opacity.value =
+  // effects.push(bloom)
 
-  const scanline = new ScanlineEffect({ density: 2 })
-  effects.push(scanline)
+  // const scanline = new ScanlineEffect({ density: 2 })
+  // effects.push(scanline)
 
   //  TODO burn in!!!!!
 
@@ -108,12 +108,12 @@ module.exports = ({ hyperTerm, xTerm }) => {
 
   // TODO RGB shift?
 
-  const curvedMonitor = new CurvedMonitor()
-  effects.push(curvedMonitor)
+  // const curvedMonitor = new CurvedMonitor()
+  // effects.push(curvedMonitor)
 
-  // removes artifacts from the CurvedMonitor effect
-  const sampling = new Sampling()
-  effects.push(sampling)
+  // // removes artifacts from the CurvedMonitor effect
+  // const sampling = new Sampling()
+  // effects.push(sampling)
 
   return { pass: new EffectPass(null, ...effects) }
 }

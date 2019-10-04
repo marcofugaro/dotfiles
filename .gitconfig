@@ -33,7 +33,11 @@
   # TODO test this, maybe HEAD must be a branch name
   undo-push = push -f origin HEAD^:HEAD
 
+  # delete branches that have been merged to master, can also be done with `git fetch --prune`
   purge = !git branch --merged master --format='%(refname:lstrip=2)' | grep -v 'master' | xargs -n 1 git branch -d
+
+  # stash also untracked files
+  stashall = stash --include-untracked
 
 [push]
   # always push only current branch
