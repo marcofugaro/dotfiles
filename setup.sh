@@ -11,7 +11,7 @@ read -p "Press any key to continue. Ctrl-C to abort."
 # Remove password from sudo
 echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
 
-# Install xcode
+# Install xcode command line tools
 xcode-select --install
 
 # Install brew
@@ -27,7 +27,7 @@ brew install vim grep openssh screen python git bash bash-completion2
 brew install cask node yarn yarn-completion tldr thefuck diff-so-fancy httpie tree hub youtube-dl ffmpeg
 
 # Install quuick-look-plugins
-brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo table-tool
+brew cask install qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo
 
 # Install npm global commands
 npm install --global fkill-cli speed-test glob-cmd trash-cli yo gsx-pdf-optimize
