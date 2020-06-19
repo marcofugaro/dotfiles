@@ -13,28 +13,25 @@
   ignorecase = true
 [alias]
   # better git log
-  superlog = log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)' --all
+  superlog = log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)'
 
-  # undo your last commit and stage the changes
-  undo = reset --soft HEAD^
+  # make git git work
+  git = !exec git
 
   # show verbose output about tags, branches or remotes
   tags = tag -l
   branches = branch -a
   remotes = remote -v
 
-  # make git git work
-  git = !exec git
-
-  # print the current branch
-  current-branch = rev-parse --abbrev-ref HEAD
+  # undo your last commit and stage the changes
+  undo = reset --soft HEAD^
 
   # undo your last push
   # TODO test this, maybe HEAD must be a branch name
   undo-push = push -f origin HEAD^:HEAD
 
-  # delete branches that have been merged to master, can also be done with `git fetch --prune`
-  purge = !git branch --merged master --format='%(refname:lstrip=2)' | grep -v 'master' | xargs -n 1 git branch -d
+  # delete branches that have been merged to the current branch, `git fetch --prune` should also do this but it doesn't
+  purge = !git branch --merged HEAD | grep -vE 'master|develop|\\*' | xargs -n 1 git branch -d
 
   # stash also untracked files
   stashall = stash --include-untracked

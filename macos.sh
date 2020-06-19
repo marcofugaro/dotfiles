@@ -34,6 +34,10 @@ defaults write com.apple.ActivityMonitor ShowCategory -int 0
 defaults write com.apple.ActivityMonitor SortColumn -string "CPUUsage"
 defaults write com.apple.ActivityMonitor SortDirection -int 0
 
+# Set the Google's dns servers
+networksetup -setdnsservers Wi-Fi 8.8.8.8
+networksetup -setdnsservers Wi-Fi 8.8.4.4
+
 # Wipe all (default) app icons from the Dock
 # This is only really useful when setting up a new Mac, or if you don’t use
 # the Dock to launch apps.
