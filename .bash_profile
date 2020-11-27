@@ -1,5 +1,5 @@
 # ll command
-alias ll='ls -GlAhF'
+alias ll='ls -l --human-readable --almost-all --classify --no-group --color=auto --group-directories-first --ignore=".DS_Store"'
 
 # git alias for typos
 alias gti='git'
@@ -26,6 +26,9 @@ alias youtube-dl-mp3='youtube-dl --extract-audio --audio-format=mp3'
 
 # shorter pdf-optimize
 alias pdf-optimize='gsx-pdf-optimize'
+
+# get your machine's ip address
+alias ip='ifconfig | grep "inet " | grep -v 127.0.0.1 | cut -d\  -f2'
 
 # case-insensitive globbing (used in pathname expansion)
 shopt -s nocaseglob

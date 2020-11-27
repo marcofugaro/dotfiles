@@ -27,11 +27,10 @@
   undo = reset --soft HEAD^
 
   # undo your last push
-  # TODO test this, maybe HEAD must be a branch name
-  undo-push = push -f origin HEAD^:HEAD
+  undo-push = !git push -f origin HEAD^:$(git symbolic-ref HEAD)
 
   # delete branches that have been merged to the current branch, `git fetch --prune` should also do this but it doesn't
-  purge = !git branch --merged HEAD | grep -vE 'master|develop|\\*' | xargs -n 1 git branch -d
+  purge = !git branch --merged HEAD | grep -vE 'master|develop|main\\*' | xargs -n 1 git branch -d
 
   # stash also untracked files
   stashall = stash --include-untracked
