@@ -24,6 +24,9 @@ alias map='xargs -n1'
 # shorter youtube-dl command to download audio only
 alias youtube-dl-mp3='youtube-dl --extract-audio --audio-format=mp3'
 
+# always download mp4 files with youtube-dl
+alias youtube-dl='youtube-dl --format "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4"'
+
 # shorter pdf-optimize
 alias pdf-optimize='gsx-pdf-optimize'
 
