@@ -45,12 +45,15 @@ shopt -s cdspell
 shopt -s autocd 2> /dev/null
 shopt -s globstar 2> /dev/null
 
-# bash & git completition
-[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ] && . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
+# add brew to the path
+eval "$(/opt/homebrew/bin/brew shellenv)"
 
 # start thefuck
 # https://github.com/nvbn/thefuck
 eval $(thefuck --alias)
+
+# bash & git completition
+[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ] && . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
 
 # add to the path the GNU core utilities
 PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
@@ -58,7 +61,7 @@ PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
 # init the bash prompt
 source ~/.bash_prompt
 
-# set the tab title as the current path
+# set the tab title as the current path
 set_tab_title() {
 	local pwd_home="${PWD/#$HOME/~}"
 	echo -en "\033]0;$pwd_home\a"

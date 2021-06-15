@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Allow Apps from Anywhere in macOS Sierra Security Gatekeeper
-sudo spctl --master-disable
-
 # Disable the “Are you sure you want to open this application?” dialog
 defaults write com.apple.LaunchServices LSQuarantine -bool false
 
@@ -38,10 +35,68 @@ defaults write com.apple.ActivityMonitor SortDirection -int 0
 networksetup -setdnsservers Wi-Fi 8.8.8.8
 networksetup -setdnsservers Wi-Fi 8.8.4.4
 
-# Wipe all (default) app icons from the Dock
-# This is only really useful when setting up a new Mac, or if you don’t use
-# the Dock to launch apps.
-#defaults write com.apple.dock persistent-apps -array
+
+###############################################################################
+# Preferences                                                                 #
+###############################################################################
+
+# Disable automatic app store updates
+sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdate -bool false
+
+# Disable macOS automatic updates
+sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdateRestartRequired -bool false
+
+# Disable automatic Software Update update checks
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled -bool false
+
+# Disable automatic software update download
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false
+
+# Disable Notification Centre
+defaults write com.apple.AppleMultitouchTrackpad.plist TrackpadTwoFingerFromRightEdgeSwipeGesture -bool false
+
+# Disable Force click to look up
+defaults write "Apple Global Domain" com.apple.trackpad.forceClick -bool false
+
+# Disable automatically rearrange Spaces based on recent use
+defaults write com.apple.dock mru-spaces -bool false
+
+# Disable screensaver
+defaults -currentHost write com.apple.screensaver idleTime 0
+
+# Don't go to sleep when using power adapter
+sudo pmset -c displaysleep 10
+sudo pmset -c sleep 0
+
+# Set a blazingly fast keyboard repeat rate
+defaults write NSGlobalDomain KeyRepeat -int 1
+defaults write NSGlobalDomain InitialKeyRepeat -int 20
+
+# Restart the preferences
+killall cfprefsd
+
+
+###############################################################################
+# Dock                                                                        #
+###############################################################################
+
+# Customize the app icons from the Dock
+dock_item() {
+    printf '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>%s</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>', "$1"
+}
+
+defaults write com.apple.dock persistent-apps -array \
+    "$(dock_item /Applications/Google\ Chrome.app)" \
+    "$(dock_item /Applications/Visual\ Studio\ Code.app)" \
+    "$(dock_item /Applications/Hyper.app)" \
+    "$(dock_item /Applications/Discord.app)"
+
+# Hide recent section
+defaults write com.apple.dock "show-recents" -bool "false"
+
+# Restart the dock
+killall Dock
+
 
 ###############################################################################
 # Finder                                                                      #
@@ -55,8 +110,13 @@ defaults write NSGlobalDomain AppleShowAllExtensions -bool true
 
 # Set Home as the default location for new Finder windows
 # For other paths, use `PfLo` and `file:///full/path/here/`
-defaults write com.apple.finder NewWindowTarget -string "PfDe"
-defaults write com.apple.finder NewWindowTargetPath -string "file://${HOME}/"
+defaults write com.apple.finder NewWindowTarget -string "PfHm"
+
+# Customize the favorites
+mysides remove Recents
+mysides remove Documents
+mysides add marcofugaro "file://${HOME}/"
+mysides add Code "file://${HOME}/Code"
 
 # Keep folders on top when sorting by name
 defaults write com.apple.finder _FXSortFoldersFirst -bool true
@@ -67,6 +127,19 @@ defaults write com.apple.finder FXDefaultSearchScope -string "SCcf"
 # Disable the warning when changing a file extension
 defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
 
+# Remove toolbar title rollover delay
+defaults write NSGlobalDomain "NSToolbarTitleViewRolloverDelay" -float "0"
+
 # Avoid creating .DS_Store files on network or USB volumes
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
 defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
+
+# Use column view in all Finder windows by default
+# Four-letter codes for the other view modes: `icnv`, `Nlsv `, `glyv`
+defaults write com.apple.finder FXPreferredViewStyle clmv
+
+# Sort by kind
+/usr/libexec/PlistBuddy -c "Set :StandardViewSettings:IconViewSettings:arrangeBy kind" ~/Library/Preferences/com.apple.finder.plist
+
+# Reset the finder
+killall Finder
