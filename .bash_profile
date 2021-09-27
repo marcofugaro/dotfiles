@@ -58,12 +58,15 @@ eval $(thefuck --alias)
 # add to the path the GNU core utilities
 PATH="$(brew --prefix)/opt/coreutils/libexec/gnubin:$PATH"
 
+# run brew with the correct Apple Silicon M1 flag
+ARCHFLAGS="-arch arm64"
+
 # init the bash prompt
 source ~/.bash_prompt
 
 # set the tab title as the current path
 set_tab_title() {
-	local pwd_home="${PWD/#$HOME/~}"
+	local pwd_home="${PWD/#$HOME/\~}"
 	echo -en "\033]0;$pwd_home\a"
 }
 PROMPT_COMMAND="set_tab_title"

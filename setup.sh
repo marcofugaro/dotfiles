@@ -31,7 +31,7 @@ brew install coreutils
 brew install vim grep openssh screen python git bash bash-completion2
 
 # Install commands
-brew install cask node tldr thefuck diff-so-fancy tree hub youtube-dl webtorrent-cli
+brew install node tldr thefuck diff-so-fancy tree hub youtube-dl webtorrent-cli draco
 
 # Install quick-look-plugins
 brew install --cask qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo gltfquicklook
@@ -63,6 +63,10 @@ cp .hyper-postprocessing.js ~
 
 # Install fonts
 cp ProFontWindows.ttf ~/Library/Fonts
+
+# Make python3 the default
+sudo mkdir -p /usr/local/bin
+sudo ln -s -f $(which python3) /usr/local/bin/python
 
 # Change default shell to bash
 sudo sh -c "echo $(which bash) >> /etc/shells"

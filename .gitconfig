@@ -30,7 +30,7 @@
   undo-push = !git push -f origin HEAD^:$(git symbolic-ref HEAD)
 
   # delete branches that have been merged to the current branch, `git fetch --prune` should also do this but it doesn't
-  purge = !git branch --merged HEAD | grep -vE 'master|develop|main\\*' | xargs -n 1 git branch -d
+  purge = !git branch --merged HEAD | grep -vE 'master|main|develop|dev\\*' | xargs -n 1 git branch -d
 
   # stash also untracked files
   stashall = stash --include-untracked

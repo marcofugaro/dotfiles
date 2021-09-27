@@ -64,9 +64,9 @@ defaults write com.apple.dock mru-spaces -bool false
 # Disable screensaver
 defaults -currentHost write com.apple.screensaver idleTime 0
 
-# Don't go to sleep when using power adapter
-sudo pmset -c displaysleep 10
-sudo pmset -c sleep 0
+# Set display sleep minutes when using power adapter
+sudo pmset -c displaysleep 90
+sudo pmset -c sleep 90
 
 # Set a blazingly fast keyboard repeat rate
 defaults write NSGlobalDomain KeyRepeat -int 1
