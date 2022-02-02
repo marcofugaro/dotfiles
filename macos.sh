@@ -35,6 +35,9 @@ defaults write com.apple.ActivityMonitor SortDirection -int 0
 networksetup -setdnsservers Wi-Fi 8.8.8.8
 networksetup -setdnsservers Wi-Fi 8.8.4.4
 
+# Disable two-finger back/forward navigation on Chrome
+defaults write com.google.Chrome AppleEnableSwipeNavigateWithScrolls -bool false
+
 
 ###############################################################################
 # Preferences                                                                 #
