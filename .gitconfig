@@ -30,7 +30,11 @@
   undo-push = !git push -f origin HEAD^:$(git symbolic-ref HEAD)
 
   # delete branches that have been merged to the current branch, `git fetch --prune` should also do this but it doesn't
-  purge = !git branch --merged HEAD | grep -vE 'master|main|develop|dev\\*' | xargs -n 1 git branch -d
+  purge = !git branch --merged HEAD | grep -vE 'master|main|develop|dev' | xargs -n 1 git branch -d
+
+  # https://github.com/not-an-aardvark/git-delete-squashed
+  purge-squashed = "!f() { git for-each-ref refs/heads/ '--format=%(refname:short)' | grep -vE 'master|main|develop|dev' | while read branch; do mergeBase=$(git merge-base HEAD $branch) && [[ $(git cherry HEAD $(git commit-tree $(git rev-parse $branch^{tree}) -p $mergeBase -m _)) == '-'* ]] && git branch -D $branch; done; }; f"
+
 
   # stash also untracked files
   stashall = stash --include-untracked
