@@ -78,6 +78,9 @@ defaults write NSGlobalDomain InitialKeyRepeat -int 20
 # Restart the preferences
 killall cfprefsd
 
+# Add crontab to kill the new quicklook
+echo "0 9 * * * pkill -9 -f QuickLookUIService" | crontab -
+
 
 ###############################################################################
 # Dock                                                                        #

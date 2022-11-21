@@ -41,11 +41,7 @@ npm install --global fkill-cli speed-test glob-cmd trash-cli yo gsx-pdf-optimize
 
 # Install applications
 brew tap homebrew/cask-versions
-brew install --cask firefox-nightly slack discord hyper visual-studio-code sublime-text alfred spotify vlc table-tool android-file-transfer mysides blender
-
-# Install modified chrome
-# More info: https://github.com/feegloo/macos-chrome-custom
-curl -s https://raw.githubusercontent.com/feegloo/macos-chrome-custom/master/install | bash
+brew install --cask google-chrome firefox-nightly slack discord hyper visual-studio-code sublime-text alfred spotify vlc table-tool android-file-transfer mysides blender
 
 # Install vscode and hyper settings extensions
 code --install-extension shan.code-settings-sync
