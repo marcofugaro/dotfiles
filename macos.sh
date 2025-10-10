@@ -79,7 +79,7 @@ defaults write NSGlobalDomain InitialKeyRepeat -int 20
 killall cfprefsd
 
 # Add crontab to kill the new quicklook
-echo "0 9 * * * pkill -9 -f QuickLookUIService" | crontab -
+echo "0 * * * * pkill -9 -f QuickLookUIService" | crontab -
 
 
 ###############################################################################

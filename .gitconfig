@@ -46,6 +46,9 @@
   # make `git push` push relevant annotated tags when pushing branches out
   followTags = true
 
+  # make the branches track their origin counterpart always
+  autoSetupRemote = true
+
 [pull]
   # automatically rebase instead of merging when you pull
   rebase = true
