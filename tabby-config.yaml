@@ -222,6 +222,7 @@ terminal:
   hideTabOptionsButton: true
   fontSize: 16
   linePadding: 1
+  warnOnMultilinePaste: false
 ssh: {}
 clickableLinks: {}
 accessibility:
