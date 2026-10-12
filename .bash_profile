@@ -30,6 +30,47 @@ alias youtube-dl='youtube-dl --format "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4
 # shorter pdf-optimize
 alias pdf-optimize='gsx-pdf-optimize'
 
+# Redice size/bitrate of .mov file
+optimize-mov() {
+  bitrate="8M"
+  input=""
+
+  # Parse args: -b accepted before or after the filename
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -b) bitrate="$2"; shift 2 ;;
+      -b*) bitrate="${1#-b}"; shift ;;
+      -*) echo "Usage: optimize-mov [-b bitrate] file.mov"; return 1 ;;
+      *) input="$1"; shift ;;
+    esac
+  done
+
+  # Validate input
+  if [ -z "$input" ]; then
+    echo "Usage: optimize-mov [-b bitrate] file.mov"
+    return 1
+  fi
+
+  if [ ! -f "$input" ]; then
+    echo "File not found: $input"
+    return 1
+  fi
+
+  # Build output filename
+  base="${input%.*}"
+  ext="${input##*.}"
+  output="${base}-optimized.${ext}"
+
+  # Prevent overwrite
+  if [ -f "$output" ]; then
+    echo "Output already exists: $output"
+    return 1
+  fi
+
+  # Run ffmpeg
+  ffmpeg -i "$input" -c:v libx264 -b:v "$bitrate" -c:a aac -b:a 192k "$output"
+}
+
 # get your machine's ip address
 alias ip='ifconfig | grep "inet " | grep -v 127.0.0.1 | cut -d\  -f2'
 
