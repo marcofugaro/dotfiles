@@ -106,9 +106,9 @@ M4 base model rose from €729 at launch to €979.
 ```
  Android (Claude app, Termius, Chrome) ─┐                ┌─ Mac mini, always on
                                         ├── Tailscale ───┤   tmux → Claude Code sessions (Remote Control on)
- MacBook (claude.ai/code, VS Code,      │                │   Vite dev server on localhost:5173
+ MacBook (claude.ai/code, VS Code,      │                │   dev servers on localhost:5173–5180, one per repo
    Terminal) ───────────────────────────┘                │   node-webgpu tests, one at a time (GPU lock)
-                                                         └─ tailscale serve → https://mini.<tailnet>.ts.net
+                                                         └─ tailscale serve → https://mini.<tailnet>.ts.net:<port>
 ```
 
 - **Talking to Claude:** Remote Control. Every session on the mini appears in the Claude app and on claude.ai/code, and
@@ -118,11 +118,11 @@ M4 base model rose from €729 at launch to €979.
   the mini.
 - **Starting work:** ask the main session to do a task in a worktree, or say "use a workflow". Parallel tasks each get
   their own git worktree.
-- **Testing:** agents run `npm test` and `scripts/node-page/run.js` on the mini's GPU, through `scripts/gpu-lock.js`,
-  so runs never overlap.
-- **Seeing results:** on the MacBook, VS Code forwards Vite's port to `localhost`, so WebGPU works in Chrome. On the
-  phone, `tailscale serve` publishes Vite at an HTTPS address only your devices can reach (WebGPU needs HTTPS or
-  localhost).
+- **Testing:** agents run GPU tests on the mini's GPU through each repo's `scripts/gpu-lock.js`, so runs never
+  overlap.
+- **Seeing results:** on the MacBook, VS Code forwards the dev servers' ports to `localhost`, so WebGPU works in Chrome.
+  On the phone, `tailscale serve` publishes each dev server at `https://mini.<tailnet>.ts.net:<port>`, an address only
+  your devices can reach (WebGPU needs HTTPS or localhost).
 - **From your other home:** the same apps and commands. Tailscale connects your devices to the mini over the internet,
   directly when it can and through Tailscale's relays when it can't, which is slower but still works. The lamp stays at
   the main home; elsewhere, the phone notifications do its job.
@@ -186,16 +186,12 @@ outbound HTTPS connections. The real risks, most likely first:
 If you can't secure the claude.ai login, go SSH-only like levelsio: set `"disableRemoteControl": true` and give up the
 app and push notifications.
 
-**Already done in this repo (10 October 2026):**
-- `scripts/gpu-lock.js` queues GPU runs from different sessions instead of letting them overlap.
-- Vite no longer serves `.claude/settings*.json`, and is on 8.3.4, which fixes three
-  security advisories.
-
-**Still to do:**
-- Lock down the dev server's `/__save-params`, `/__save-layout` and `/__save-camera` endpoints, which accept writes to
-  any path from any website.
-- Remove `Bash(*)` from `.claude/settings.json`. Auto mode ignores it, but switching a session to another mode brings it
-  back.
+**For each repo you work on from the mini:**
+- Run GPU work through a lock like `scripts/gpu-lock.js`, so runs from different sessions queue instead of overlapping.
+- Keep Vite up to date, and make sure it doesn't serve `.claude/settings*.json`.
+- Lock down dev-server endpoints that write files, so other websites can't use them to write anywhere on disk.
+- Remove `Bash(*)` from the repo's `.claude/settings.json`. Auto mode ignores it, but switching a session to another
+  mode brings it back.
 
 ### Using it from your other home
 
@@ -207,7 +203,7 @@ while you're in the other city.
 |---|---|
 | Power cut | The mini starts again when power returns. A small UPS rides out short cuts; put the router on it too. |
 | FileVault after a restart | Turn FileVault off, or keep it and unlock it remotely through an Apple TV or Raspberry Pi left on at home (step 16). |
-| Claude and Vite after a restart | launchd starts the tmux session with Claude and Vite at boot (step 10). |
+| Claude after a restart | launchd starts the tmux session with Claude at boot (step 10); you restart the dev servers. |
 | The mini freezes | A smart plug you can switch from your phone: off and on again, and the mini boots. |
 | macOS updates | They restart the mini, so with FileVault on, install them yourself (step 14). |
 | Home internet down | Nothing to do from afar; the mini is reachable again once the connection is back. |
@@ -223,15 +219,18 @@ or Raspberry Pi that stays on at home.
 ## Part 2: Setup guide
 
 Placeholders: `<you>` is your admin account on the mini, `<tailnet>` is your Tailscale network name (shown in the
-admin console under DNS), and `<home IP>` is the mini's fixed address on your home network (step 2). The guide names
-the mini `mini` and creates a second user, `agent`, which runs Claude.
+admin console under DNS), `<home IP>` is the mini's fixed address on your home network (step 2), and `<repo>` is one of
+your repos. The guide names the mini `mini` and creates a second user, `agent`, which runs Claude.
+
+Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (step 4), then `setup-mac-mini.sh`
+(step 5). What they do is marked **Script** below; the rest is by hand.
 
 ### 0. Before the mini arrives (on the MacBook)
 
-1. Commit and push your work. The mini gets the repo from GitHub; the gitignored `*.local` scratch folders and
+1. Commit and push your work. The mini gets your repos from GitHub; the gitignored `*.local` scratch folders and
    `.claude/worktrees` stay behind.
-2. Install Tailscale on the MacBook (the standalone app from tailscale.com/download) and sign in. Turn on two-factor
-   login for the account you sign in with.
+2. Install Tailscale on the MacBook (`setup-macbook.sh` installs the app) and sign in. Turn on two-factor login for the
+   account you sign in with.
 
 ### 1. First boot
 
@@ -241,29 +240,17 @@ the mini `mini` and creates a second user, `agent`, which runs Claude.
    step 16.
 3. Sign your own account into your Apple ID and turn on **Find My Mac** (System Settings → your name → iCloud → Find
    My Mac), so a stolen mini can be located, locked or erased.
-4. Install updates (System Settings → General → Software Update). Without FileVault, turn on automatic updates. With
-   FileVault, turn off automatic installs of macOS updates and security responses: both can restart the Mac, and a
-   restart leaves it locked until someone unlocks it. Update by hand instead (step 14).
-5. Name the machine. Avoid anything personal: once HTTPS is on, the name ends up in public certificate logs.
-   ```sh
-   sudo scutil --set ComputerName mini
-   sudo scutil --set HostName mini
-   sudo scutil --set LocalHostName mini
-   ```
+4. Install updates (System Settings → General → Software Update). From then on, `macos.sh` (step 4) has the mini
+   download updates and install the ones that don't need a restart; the rest wait for you (step 14).
+5. **Script:** the machine is named `mini`. If you pick another name, avoid anything personal: once HTTPS is on, the
+   name ends up in public certificate logs.
 
 ### 2. Power, sharing, firewall
 
-```sh
-# Never sleep, wake on network access, restart after a power cut
-sudo pmset -a sleep 0 disksleep 0 womp 1 autorestart 1
-
-# Firewall with stealth mode; the built-in SSH server stays allowed
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
-```
-
-- System Settings → General → Sharing → **Remote Login**: on. Choose "Only these users" and add `<you>`, and `agent`
-  once step 3 creates it. Leave "Allow full disk access for remote users" off.
+- **Script:** the mini never sleeps, wakes on network access and restarts after a power cut. The firewall is on with
+  stealth mode, and the built-in SSH server stays allowed.
+- System Settings → General → Sharing → **Remote Login**: on. Choose "Only these users" and add `<you>`;
+  `setup-mac-mini.sh` adds `agent`. Leave "Allow full disk access for remote users" off.
 - Screen Sharing is optional, for the rare times you need the desktop.
 - **Ethernet and a fixed address:** connect the mini by cable, and in your router give it a fixed address (a DHCP
   reservation); that's `<home IP>`. Unlocking FileVault from the other city (step 16) needs both: one report found the
@@ -271,59 +258,48 @@ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
 - **For running it from afar:** plug the mini into a smart plug you can switch from your phone, and set the plug to
   turn back on after a power cut. A small UPS keeps the mini and the router running through short outages.
 
+
 ### 3. A separate user for Claude
 
-System Settings → Users & Groups → Add User. Choose **Standard** (not Administrator), name it `agent`, and give it a
-strong password. Don't sign it into an Apple ID, a browser or a password manager.
-
-macOS leaves home folders readable by other users, so make yours private:
-```sh
-sudo chmod 700 /Users/<you>
-```
+**Script:** `setup-mac-mini.sh` creates `agent`, a standard user (not an administrator), and asks for its password;
+give it a strong one. Don't sign it into an Apple ID, a browser or a password manager. The script also makes your home
+folder private, since macOS leaves home folders readable by other users.
 
 ### 4. Tools (as `<you>`)
 
+Download the dotfiles as a zip (see [README.md](README.md)), unzip them, and in that folder run:
 ```sh
-# Command Line Tools: git and compilers
-xcode-select --install
-
-# Homebrew
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-eval "$(/opt/homebrew/bin/brew shellenv)"
-
-# Node, tmux, Mosh, the GitHub CLI and the Tailscale daemon
-brew install node tmux mosh gh tailscale
+./setup.sh
 ```
-
+- It installs Homebrew, Node, gh, Claude Code and your dotfiles, and applies `macos.sh`.
+- Answer **n** when it offers to generate an SSH key for GitHub: your personal key stays off the mini (step 7).
 - `agent` can run everything Homebrew installs but can't install more, so do installs as `<you>`.
 - Your MacBook runs Node 25. If a test misbehaves, install the same major version on the mini.
 
-### 5. Tailscale
+### 5. Tailscale, then the mini's setup
 
-1. In the admin console (login.tailscale.com):
+1. In the admin console (login.tailscale.com), before running the script:
    - **DNS:** turn on MagicDNS and HTTPS certificates.
    - **Settings → Device management:** turn on device approval, so new devices need your OK.
    - **Access controls:** replace the default allow-all policy with this one. Your devices can reach the mini, but the
-     mini can't reach them. Port 22 is SSH, 443 is `tailscale serve`, and the UDP range is Mosh.
+     mini can't reach them. Port 22 is SSH, 5173–5180 are the dev servers, and the UDP range is Mosh.
      ```json
      {
        "tagOwners": { "tag:mini": ["autogroup:admin"] },
        "grants": [
          { "src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"] },
-         { "src": ["autogroup:member"], "dst": ["tag:mini"], "ip": ["tcp:22", "tcp:443", "udp:60000-61000"] }
+         { "src": ["autogroup:member"], "dst": ["tag:mini"], "ip": ["tcp:22", "tcp:5173-5180", "udp:60000-61000"] }
        ]
      }
      ```
    - Never add the `funnel` attribute; Funnel makes a service public on the internet.
-2. On the mini, as `<you>`:
+2. On the mini, as `<you>`, in the dotfiles folder:
    ```sh
-   sudo tailscaled install-system-daemon
-   sudo tailscale up --hostname=mini --advertise-tags=tag:mini
+   ./setup-mac-mini.sh
    ```
-   Open the link it prints and approve the device. The mini is now `mini.<tailnet>.ts.net`. This daemon starts at boot,
-   before anyone logs in, and tagged devices never expire off the network. It doesn't update itself, so keep it current
-   (step 14).
+   It does everything marked **Script** in this guide. When `tailscale up` prints a link, open it and approve the
+   device; the mini is then `mini.<tailnet>.ts.net`. The Tailscale daemon starts at boot, before anyone logs in, and
+   tagged devices never expire off the network. It doesn't update itself; `./setup-mac-mini.sh --update` does (step 14).
 3. On the phone, install Tailscale from the Play Store and sign in with the same account.
 
 ### 6. SSH keys
@@ -367,20 +343,15 @@ ssh mini 'cat >> ~/.ssh/authorized_keys'   # paste the public key, press Enter, 
 ```
 In Termius, add a host: address `mini.<tailnet>.ts.net`, user `agent`, and that key.
 
-**Lock SSH to keys and to your tailnet.** Do this as `<you>` on the mini (`ssh mini-admin`). Keep that session open
-until the tests pass, so a mistake can't lock you out.
+**Lock SSH to keys and to your tailnet.** Do this as `<you>` on the mini (`ssh mini-admin`), in the dotfiles folder.
+Keep that session open until the tests pass, so a mistake can't lock you out.
 ```sh
-sudo tee /etc/ssh/sshd_config.d/000-hardening.conf >/dev/null <<'EOF'
-PasswordAuthentication no
-KbdInteractiveAuthentication no
-PermitRootLogin no
-AuthenticationMethods publickey
-AllowUsers agent@100.64.0.0/10 agent@fd7a:115c:a1e0::/48 <you>@100.64.0.0/10 <you>@fd7a:115c:a1e0::/48
-EOF
-sudo sshd -t && echo "config OK"
+./setup-mac-mini.sh --lock-ssh
 ```
-- macOS allows password logins by default, and both of the first two lines are needed to stop them.
-- The `000-` prefix makes this file win over Apple's own `100-macos.conf`.
+- It turns off password logins, which macOS allows by default, and root logins, and accepts `agent` and `<you>` only
+  from Tailscale addresses.
+- Its file, `/etc/ssh/sshd_config.d/000-hardening.conf`, wins over Apple's own `100-macos.conf` thanks to the `000-`
+  prefix.
 - The new rules apply from the next connection.
 
 Test from the MacBook:
@@ -389,194 +360,99 @@ ssh mini 'echo key login works'
 ssh -o PubkeyAuthentication=no mini   # must fail with "Permission denied"
 ```
 
-To keep a way in when Tailscale is down, add your home network range to `AllowUsers` (for example
-`agent@192.168.1.0/24`).
+To keep a way in when Tailscale is down, add your home network range to `AllowUsers` in that file (for example
+`agent@192.168.1.0/24`), and again after each `--lock-ssh`.
 
 ### 7. GitHub access
 
-The mini gets its own token, limited to this repo; don't copy your personal SSH key or your current gh token to it.
+The mini gets its own token, limited to the repos it works on; don't copy your personal SSH key or your current gh
+token to it.
 
 1. On github.com: Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate.
-   - Repository access: only `marcofugaro/vibecoding-playground`
+   - Repository access: only the repos the mini works on
    - Permissions: Contents read/write, Pull requests read/write
    - Expiration: 90 days
 2. On the mini, as `agent` (`ssh mini`):
    ```sh
-   echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile && source ~/.zprofile
    gh auth login        # choose GitHub.com, HTTPS, then "Paste an authentication token"
    gh auth setup-git
-   git config --global user.name "Marco Fugaro"
-   git config --global user.email "<your email>"
    ```
+   Homebrew is already on `agent`'s path, and its git name and email come from your `.gitconfig`.
 
-### 8. The repo
+### 8. The repos
 
-As `agent`:
+As `agent`, clone each repo into `~/Code`:
 ```sh
-mkdir -p ~/Code && cd ~/Code
-git clone https://github.com/marcofugaro/vibecoding-playground.git
-cd vibecoding-playground
-npm ci
-node scripts/gpu-lock.js -- npm test
+cd ~/Code
+git clone https://github.com/marcofugaro/<repo>.git
+cd <repo> && npm ci
 ```
-The last command is the real check: it runs the node-webgpu tests on the mini's GPU from an SSH session.
+- If the repo has GPU tests, run them once through its lock, for example `node scripts/gpu-lock.js -- npm test`. It's
+  the real check that SSH sessions get the mini's GPU.
+- **Ports:** each repo's dev server gets its own port from 5173 to 5180. Pin it in the repo's Vite config, so its
+  address never changes:
+  ```js
+  server: { port: 5174, strictPort: true },
+  ```
+  Without that, Vite takes the next free port, and the order you start them in decides which repo gets which.
 
 ### 9. Claude Code
 
-As `agent`:
+**Script:** `setup-mac-mini.sh` installs Claude Code for `agent`, in `~/.local/bin`, where it updates itself. It also
+writes:
+- `agent`'s `~/.claude/settings.json`, if there's none yet:
+  - `remoteControlAtStartup`: every session shows up in the Claude app without typing `/remote-control`.
+  - `inputNeededNotifEnabled` and `agentPushNotifEnabled` push to your phone when Claude needs input or has something
+    to report.
+  - `dialogExpiry: "never"`: a question sent to your phone or browser otherwise expires after 5 minutes and counts as
+    denied.
+  - `modelSettings` sets the effort to xhigh: a top-level `effortLevel` doesn't apply to Opus 5.5.
+  - `permissions.defaultMode: "auto"`.
+- Machine-wide rules that `agent` can't loosen, in `/Library/Application Support/ClaudeCode/managed-settings.json`:
+  - No session can switch to bypass mode.
+  - Claude's own file tools can't read credentials. A script could still read them, which is why Claude runs as a
+    separate user with nothing valuable on it.
+  - Every `git push` asks you first, on your phone. Remove that rule if it gets tedious.
+- The rules for Claude on this machine, [CLAUDE.md](CLAUDE.md) followed by [CLAUDE-mac-mini.md](CLAUDE-mac-mini.md), in
+  `~/.claude/CLAUDE.md` for both users, with your tailnet name filled in.
+
+By hand, as `agent`:
 ```sh
-curl -fsSL https://claude.ai/install.sh | bash
 claude auth login    # your claude.ai account, not an API key
 claude doctor
 ```
-- If `claude` isn't found afterwards, follow the PATH line the installer prints.
 - Over SSH, `claude auth login` prints a link: open it on the MacBook and paste the code back.
 - SSH sessions can't unlock the keychain, so the login is saved in `~/.claude/.credentials.json`.
 - Don't use an API key: Remote Control only works with a claude.ai login.
 
-`~/.claude/settings.json` for `agent`:
-```json
-{
-  "remoteControlAtStartup": true,
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
-  "dialogExpiry": "never",
-  "modelSettings": { "claude-opus-5-5": { "effortLevel": "xhigh" } },
-  "permissions": { "defaultMode": "auto" }
-}
-```
-- `remoteControlAtStartup`: every session shows up in the Claude app without typing `/remote-control`.
-- The two notification settings push to your phone when Claude needs input or has something to report.
-- `dialogExpiry`: a question sent to your phone or browser otherwise expires after 5 minutes and counts as denied.
-  `"never"` makes it wait for your answer.
-- `modelSettings`: a top-level `effortLevel` doesn't apply to Opus 5.5.
-
-Machine-wide rules that `agent` can't loosen (as `<you>`):
+Bring your Claude memory over from the MacBook, for each repo. Its folder name follows the repo path, which changes
+because the user is `agent`:
 ```sh
-sudo mkdir -p "/Library/Application Support/ClaudeCode"
-sudo tee "/Library/Application Support/ClaudeCode/managed-settings.json" >/dev/null <<'EOF'
-{
-  "permissions": {
-    "disableBypassPermissionsMode": "disable",
-    "deny": ["Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.claude/.credentials.json)"],
-    "ask": ["Bash(git push *)"]
-  }
-}
-EOF
-sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
-sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
-```
-- No session can switch to bypass mode.
-- The deny rules stop Claude's own file tools from reading credentials. A script could still read them, which is why
-  Claude runs as a separate user with nothing valuable on it.
-- The `ask` rule makes every `git push` ask you first, on your phone. Remove it if that gets tedious.
-
-Rules for Claude on this machine are in [CLAUDE.md](CLAUDE.md), next to this guide. Replace `<tailnet>` in it with
-your Tailscale network name, then copy it from the MacBook to `agent`'s `~/.claude/CLAUDE.md`:
-```sh
-scp ~/Desktop/mac-mini/CLAUDE.md mini:.claude/CLAUDE.md
-```
-
-Bring your Claude memory over from the MacBook. Its folder name follows the repo path, which changes because the user
-is `agent`:
-```sh
-ssh mini 'mkdir -p ~/.claude/projects/-Users-agent-Code-vibecoding-playground'
-scp -r ~/.claude/projects/-Users-marcofugaro-Code-vibecoding-playground/memory \
-  mini:.claude/projects/-Users-agent-Code-vibecoding-playground/
+ssh mini 'mkdir -p ~/.claude/projects/-Users-agent-Code-<repo>'
+scp -r ~/.claude/projects/-Users-marcofugaro-Code-<repo>/memory mini:.claude/projects/-Users-agent-Code-<repo>/
 ```
 From then on the two copies drift apart; treat the mini's as the main one.
 
 ### 10. Sessions that keep running: tmux
 
-`~/.tmux.conf` for `agent`:
-```
-set -g mouse on
-set -g history-limit 100000
-```
+**Script:** for `agent`, `setup-mac-mini.sh` sets up:
+- `~/.tmux.conf`, with the mouse on and a long scrollback.
+- A few lines in `~/.zshrc` that land every SSH login in the tmux session `main`, like levelsio. They skip VS Code's
+  own terminals.
+- `~/mini-up.sh`, which starts the main Claude session in tmux window `claude`, in `~/Code`, unless it's already
+  running, and a launchd job that runs it as `agent` at every boot. After a restart you can also run it yourself:
+  `zsh -l ~/mini-up.sh`.
 
-To land in the same tmux session on every SSH login, like levelsio, add this to `~/.zshrc`. It skips VS Code's own
-terminals.
+Start each repo's dev server in its own window, named after the repo. It keeps running after you disconnect:
 ```sh
-if [[ -n "$SSH_CONNECTION" && -z "$TMUX" && "$TERM_PROGRAM" != "vscode" && $- == *i* ]]; then
-  tmux new-session -A -s main
-fi
+tmux new-window -t main -n <repo> -c ~/Code/<repo> "npm run dev"
 ```
 
-Start things once; they keep running after you disconnect:
-```sh
-cd ~/Code/vibecoding-playground
-claude -n main     # window 0: the main session, also visible in the Claude app
-# Ctrl-b c opens a new window
-npm run dev        # window 1: Vite on localhost:5173
-# Ctrl-b d detaches; everything keeps running
-```
-**Bring them back after every restart.** Save this as `~/mini-up.sh` (as `agent`). It does the same as the commands
-above, and does nothing if the session already exists:
-```zsh
-#!/bin/zsh -l
-# Starts the main Claude session and the dev server in tmux, unless they're already running.
-# launchd runs it at boot; after a restart you can also run it yourself: zsh -l ~/mini-up.sh
-cd ~/Code/vibecoding-playground || exit 1
-tmux has-session -t main 2>/dev/null && exit 0
-
-# At boot the network can take a moment to come up, and Claude needs it
-for i in {1..24}; do
-  curl -sS -m 5 -o /dev/null https://api.anthropic.com && break
-  sleep 5
-done
-
-tmux new-session -d -s main -n claude -c "$PWD" "$HOME/.local/bin/claude -n main"
-tmux new-window -t main -n vite -c "$PWD" "npm run dev"
-```
-
-Then, as `<you>`, have launchd run it as `agent` at every boot:
-```sh
-sudo tee /Library/LaunchDaemons/local.mini-up.plist >/dev/null <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>local.mini-up</string>
-  <key>UserName</key>
-  <string>agent</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/zsh</string>
-    <string>-l</string>
-    <string>/Users/agent/mini-up.sh</string>
-  </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>HOME</key>
-    <string>/Users/agent</string>
-    <key>LANG</key>
-    <string>en_US.UTF-8</string>
-    <key>TERM</key>
-    <string>xterm-256color</string>
-  </dict>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>AbandonProcessGroup</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>/tmp/mini-up.log</string>
-  <key>StandardErrorPath</key>
-  <string>/tmp/mini-up.log</string>
-</dict>
-</plist>
-EOF
-sudo chown root:wheel /Library/LaunchDaemons/local.mini-up.plist
-sudo chmod 644 /Library/LaunchDaemons/local.mini-up.plist
-plutil -lint /Library/LaunchDaemons/local.mini-up.plist
-sudo launchctl bootstrap system /Library/LaunchDaemons/local.mini-up.plist
-```
-
-Check it once with a restart (`sudo reboot`, or `sudo fdesetup authrestart` with FileVault on):
+Check the boot job once with a restart (`sudo reboot`, or `sudo fdesetup authrestart` with FileVault on):
 1. About a minute later the main session should appear in the Claude app, and `ssh mini` should land in the tmux
    session.
-2. Run `node scripts/gpu-lock.js -- npm test` in it. A tmux started by launchd at boot runs outside any login, and I
-   couldn't confirm that macOS gives such processes the GPU. If the tests find no GPU, remove the job with
+2. Run a repo's GPU tests in it. A tmux started by launchd at boot runs outside any login, and I couldn't confirm that
+   macOS gives such processes the GPU. If the tests find no GPU, remove the job with
    `sudo launchctl bootout system/local.mini-up`, stop the session it started with `tmux kill-server`, and from then
    on, after each restart, run `zsh -l ~/mini-up.sh` yourself over SSH (it works from the phone too).
 
@@ -589,43 +465,34 @@ Check it once with a restart (`sudo reboot`, or `sudo fdesetup authrestart` with
 ### 11. Seeing results
 
 **On the MacBook: VS Code Remote-SSH (recommended)**
-1. Install Microsoft's "Remote - SSH" extension.
-2. Command palette → "Remote-SSH: Connect to Host…" → `mini` → open `~/Code/vibecoding-playground`.
+1. Install Microsoft's "Remote - SSH" extension (`setup-macbook.sh` does).
+2. Command palette → "Remote-SSH: Connect to Host…" → `mini` → open `~/Code/<repo>`.
 3. When VS Code offers, install the Claude Code extension in that window; it runs on the mini. Its permission prompts
    and questions appear in the panel on the MacBook and, through Remote Control, in the Claude app too; answer on
    either. A chat in the panel may not survive the MacBook sleeping, so start long jobs in tmux (step 10).
-4. When Vite runs on the mini, VS Code forwards its port, and the Ports panel shows the `localhost` address. Because
-   it's localhost, WebGPU works in Chrome.
+4. When a dev server runs on the mini, VS Code forwards its port, and the Ports panel shows the `localhost` address.
+   Because it's localhost, WebGPU works in Chrome.
 
-Without VS Code, run `ssh -N -L 5174:localhost:5173 mini` and open http://localhost:5174.
+Without VS Code, run `ssh -N -L <port>:localhost:<port> mini` and open `http://localhost:<port>`.
 
 **On the phone: `tailscale serve`**
-```sh
-sudo tailscale serve --bg 5173    # on the mini, as <you>; the setting survives restarts
-tailscale serve status            # shows what's published
-```
-Then open `https://mini.<tailnet>.ts.net/examples/…` in Chrome. Vite rejects hostnames it doesn't know, so add the
-exact name to `vite.config.js`:
-```js
-server: {
-  allowedHosts: ['mini.<tailnet>.ts.net'],
-  // …
-},
-```
-If hot reload doesn't connect through it, also set `server.hmr.clientPort: 443`.
+
+**Script:** `setup-mac-mini.sh` publishes ports 5173–5180 with `tailscale serve`, each at the same port on the mini's
+tailnet address, where only your devices can reach it. Open a repo's dev server at
+`https://mini.<tailnet>.ts.net:<port>/` in Chrome; `tailscale serve status` shows what's published.
+- Vite rejects hostnames it doesn't know. The script allows the tailnet name for every repo through
+  `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` in `agent`'s `~/.zprofile`, so no repo needs `allowedHosts`.
+- Hot reload should connect through it, because the page's port is the dev server's port. If it doesn't, set
+  `server.hmr.clientPort` to that port in the repo's Vite config.
 
 ### 12. Phone
 
 - **Tailscale:** the same account as the other devices.
 - **Claude:** the Code tab lists the mini's sessions. Allow notifications.
 - **Termius:** the SSH host from step 6. Turn on Mosh for that host if your connection is flaky.
-- **Chrome:** for the `tailscale serve` address.
+- **Chrome:** for the dev servers' addresses.
 
-For Mosh, let its server through the mini's firewall (as `<you>`):
-```sh
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add "$(readlink -f /opt/homebrew/bin/mosh-server)"
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$(readlink -f /opt/homebrew/bin/mosh-server)"
-```
+**Script:** Mosh's server is let through the mini's firewall.
 
 ### 13. Accounts
 
@@ -637,20 +504,24 @@ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$(readlink -f
 
 ### 14. Maintenance
 
-- **Weekly updates** (as `<you>`): `brew update && brew upgrade`. The Tailscale daemon doesn't update itself; Claude
-  Code does (check with `claude doctor`).
-- **Planned restart:** `sudo reboot`. With FileVault on, use `sudo fdesetup authrestart` instead, which restarts
-  without stopping at the FileVault screen.
-- **macOS updates with FileVault on:** first make the next restart skip the FileVault screen, then install:
+- **Weekly updates:** as `<you>`, in the dotfiles folder and inside tmux, run `./setup-mac-mini.sh --update`. It runs
+  `brew update && brew upgrade`, then lets the new Mosh (and the lamp's Node) through the firewall again and reinstalls
+  the Tailscale daemon, which Homebrew doesn't update. Restarting Tailscale can drop SSH sessions over it for a moment.
+  Claude Code updates itself (check with `claude doctor`).
+- **macOS updates:** the mini downloads them by itself and installs the ones that don't need a restart. Install the
+  rest when it suits you: `sudo softwareupdate --install --all --restart`. With FileVault on, first make the next
+  restart skip the FileVault screen:
   ```sh
   sudo fdesetup authrestart -delayminutes -1
   sudo softwareupdate --install --all --restart
   ```
   Apple notes the skip "may not work on all systems", so try it once while you're at the main home.
-- **Power cut:** the mini starts again when power returns, and launchd brings back Claude and Vite (step 10). With
-  FileVault on, it first waits at the unlock screen. macOS 26 can unlock it over SSH, but only at its home network
-  address and only with your password: `ssh <you>@<home IP>`. From the main home that works directly; from the other
-  city it goes through the Apple TV or Raspberry Pi (step 16).
+- **Planned restart:** `sudo reboot`. With FileVault on, use `sudo fdesetup authrestart` instead, which restarts
+  without stopping at the FileVault screen.
+- **Power cut:** the mini starts again when power returns, and launchd brings back the main Claude session (step 10);
+  restart the dev servers yourself. With FileVault on, it first waits at the unlock screen. macOS 26 can unlock it over
+  SSH, but only at its home network address and only with your password: `ssh <you>@<home IP>`. From the main home
+  that works directly; from the other city it goes through the Apple TV or Raspberry Pi (step 16).
 - **Frozen mini:** switch the smart plug off and on from its app; the mini boots when power returns.
 - **Lost phone:**
   1. In the Tailscale admin console, remove the phone under Machines. Access stops immediately.
@@ -662,8 +533,9 @@ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$(readlink -f
 
 A Yeelight Cube on your desk can animate what Claude is doing: a spinning blue gradient while it works, a pink pulse
 when it needs you, a slow orange breathe when it's done. The mini drives it directly over Wi-Fi, so it keeps working
-through reboots with nobody logged in, and Claude can change the colors and animations. Parts list, files and steps:
-[yeelight-cube/README.md](yeelight-cube/README.md).
+through reboots with nobody logged in, and Claude can change the colors and animations. Parts list and how it works:
+[yeelight-cube/README.md](yeelight-cube/README.md). Once the cube is on your Wi-Fi with a fixed address, run
+`./setup-mac-mini-status-lamp.sh` as `<you>` in the dotfiles folder to install it.
 
 ### 16. Only with FileVault: unlocking it from the other city
 
@@ -691,17 +563,15 @@ routes automatically.
 ### Checklist
 
 - [ ] Work pushed
-- [ ] FileVault decided (off, or on with step 16 tested); Find My on; updates set up; machine named `mini`
-- [ ] Never sleeps, restarts after a power cut, firewall and stealth mode on
+- [ ] FileVault decided (off, or on with step 16 tested); Find My on; updates installed
 - [ ] Ethernet with a fixed home address; smart plug that turns back on after a power cut; UPS if you have one
-- [ ] `agent` standard user created; your home folder is `chmod 700`
-- [ ] Homebrew, Node, tmux, Mosh, gh and Tailscale installed
-- [ ] Tailscale: policy set, mini tagged, device approval on, no Funnel
-- [ ] SSH keys from the MacBook and phone; password logins refused
-- [ ] Fine-grained GitHub token; repo cloned; `node scripts/gpu-lock.js -- npm test` passes
-- [ ] Claude Code logged in with claude.ai; settings, managed settings and machine notes in place; memory copied
-- [ ] `mini-up.sh` brings back Claude and Vite at boot; checked after a restart, GPU tests pass there
-- [ ] VS Code Remote-SSH works; `tailscale serve` plus `allowedHosts` for the phone
+- [ ] Tailscale console: policy set, device approval on, MagicDNS and HTTPS certificates on, no Funnel
+- [ ] `setup.sh` and `setup-mac-mini.sh` run; the mini approved in Tailscale; Remote Login on
+- [ ] SSH keys from the MacBook and the phone; `--lock-ssh` run and password logins refused
+- [ ] Fine-grained GitHub token; repos cloned, each with its own port; GPU tests pass over SSH
+- [ ] Claude Code logged in as `agent` with claude.ai; memory copied
+- [ ] The main Claude session comes back after a restart, and GPU tests pass there
+- [ ] VS Code Remote-SSH works; the dev servers open at `https://mini.<tailnet>.ts.net:<port>` on the phone
 - [ ] Tried everything from outside the home network: SSH, VS Code, the Claude app
 - [ ] Security key on the claude.ai sign-in account; trusted devices on
 

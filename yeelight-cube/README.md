@@ -42,6 +42,8 @@ still frame, refreshed every 10 seconds.
 
 ## Setup
 
+After step 1, `setup-mac-mini-status-lamp.sh` in the dotfiles folder does steps 2–5, from your admin account.
+
 ### 1. Put the cube on your network
 
 1. Set it up with the Yeelight app, on the same Wi-Fi as the mini. If the cube's settings show **LAN Control**, turn

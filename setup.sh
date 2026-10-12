@@ -1,76 +1,69 @@
 #!/bin/bash
 
+# Generate an SSH key for GitHub, skip it on Macs that shouldn't hold your personal key
+read -p "Generate an SSH key for GitHub? [y/N] " ssh_key
+if [[ "$ssh_key" == [yY] ]]; then
+  ssh-keygen -t ed25519
+  eval "$(ssh-agent -s)"
+  cat >> ~/.ssh/config <<'EOF'
+Host github.com
+  AddKeysToAgent yes
+  UseKeychain yes
+  IdentityFile ~/.ssh/id_ed25519
+EOF
+  ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+  pbcopy < ~/.ssh/id_ed25519.pub
+  read -p "The public key is in the clipboard: add it at https://github.com/settings/ssh/new, then press Enter "
+fi
 
-# Generate ssh key
-ssh-keygen -t rsa -b 4096 -C "marco.fugaro@gmail.com"
-
-# Copy ssh and wait for user to insert it in github
-pbcopy < ~/.ssh/id_rsa.pub
-echo "Now login to https://github.com/settings/keys and add the key that has already been copied to your clipboard."
-read -p "Press any key to continue. Ctrl-C to abort."
-
-# Remove password from sudo
-echo "Removing password from sudo..."
-echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
-
-# Install xcode command line tools
-xcode-select --install
-
-# Install rosetta binaries
-sudo softwareupdate --install-rosetta
-
-# Install brew
+# Install Homebrew
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 
-# Install GNU core utilities (those that come with macOS are outdated)
+# Install GNU core utilities
 brew install coreutils
 
-# Install more recent versions of some macOS tools.
-brew install vim grep openssh screen python git bash bash-completion2
+# Install a newer python
+brew install python
 
 # Install commands
-brew install node tldr thefuck diff-so-fancy tree hub youtube-dl webtorrent-cli draco
-
-# Install quick-look-plugins
-brew install --cask qlcolorcode qlstephen qlmarkdown quicklook-json qlimagesize webpquicklook qlvideo gltfquicklook
+brew install node diff-so-fancy tree gh ghostscript bat
 
 # Install npm global commands
-npm install --global fkill-cli speed-test glob-cmd trash-cli yo gsx-pdf-optimize
+npm install --global fkill-cli
 
-# Install applications
-brew tap homebrew/cask-versions
-brew install --cask google-chrome firefox-nightly slack discord hyper visual-studio-code sublime-text alfred spotify vlc table-tool android-file-transfer mysides blender
+# Touch ID for sudo, in tmux too
+brew install pam-reattach
+sudo tee /etc/pam.d/sudo_local > /dev/null <<EOF
+auth       optional       $(brew --prefix)/lib/pam/pam_reattach.so
+auth       sufficient     pam_tid.so
+EOF
 
-# Install vscode and hyper settings extensions
-code --install-extension shan.code-settings-sync
+# Install Claude Code
+curl -fsSL https://claude.ai/install.sh | bash
 
-# Create Code folder
+# Create the Code folder
 mkdir ~/Code
 
-# Set MacOS defaults
+# Set macOS defaults
 ./macos.sh
 
 # Copy dotfiles over
-cp .bash_profile ~
-cp .bash_prompt ~
-cp .inputrc ~
+cp .zshrc ~
+cp .vimrc ~
 cp .gitignore ~
 cp .gitconfig ~
-cp .hyper.js ~
-cp .hyper-postprocessing.js ~
 
-# Install fonts
-cp ProFontWindows.ttf ~/Library/Fonts
+# Install zsh plugins
+git clone --depth 1 https://github.com/jirutka/zsh-shift-select.git ~/.zsh/zsh-shift-select
 
-# Make python3 the default
-sudo mkdir -p /usr/local/bin
-sudo ln -s -f $(which python3) /usr/local/bin/python
+# Copy the global Claude Code instructions over
+mkdir -p ~/.claude
+cp CLAUDE.md ~/.claude/CLAUDE.md
 
-# Change default shell to bash
-sudo sh -c "echo $(which bash) >> /etc/shells"
-chsh -s $(which bash)
+# Make zsh the default shell
+chsh -s /bin/zsh
 
-# Launch bash
-exec bash
+# Launch zsh
+exec zsh
