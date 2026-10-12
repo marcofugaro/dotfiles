@@ -1,0 +1,11 @@
+{
+  "ip": "192.168.1.60",
+  "modules": ["5x5_blur"],
+  "fps": 12,
+  "idleOffMinutes": 30,
+  "states": {
+    "working": { "colors": ["#4f8cff", "#06164d"], "animation": "spin", "seconds": 2 },
+    "input": { "colors": ["#ff4fd8", "#3d0066"], "animation": "pulse", "seconds": 1.2 },
+    "idle": { "colors": ["#ffb04f", "#5c1a00"], "animation": "breathe", "seconds": 6 }
+  }
+}
