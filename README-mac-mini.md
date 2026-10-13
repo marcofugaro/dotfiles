@@ -175,7 +175,7 @@ outbound HTTPS connections. The real risks, most likely first:
 
 1. **The agent itself.** A malicious page an agent reads could trick it into sending out whatever it can read. So keep
    nothing worth stealing on the mini: run Claude as a separate non-admin user, give it a GitHub token limited to this
-   repo, and leave your personal SSH keys, Apple ID and password manager off it.
+   repo, and leave your personal SSH keys, iCloud data and password manager off it.
 2. **Your claude.ai account becomes a way into the mini** while Remote Control is on. claude.ai has no two-factor login
    of its own yet, so protect the Google or email account you sign in with using a security key, and turn on "Require
    trusted devices".
@@ -202,25 +202,25 @@ while you're in the other city.
 | Problem while you're away | What handles it |
 |---|---|
 | Power cut | The mini starts again when power returns. A small UPS rides out short cuts; put the router on it too. |
-| FileVault after a restart | Turn FileVault off, or keep it and unlock it remotely through an Apple TV or Raspberry Pi left on at home (step 16). |
-| Claude after a restart | launchd starts the tmux session with Claude at boot (step 10); you restart the dev servers. |
+| FileVault after a restart | It's off, so nothing waits at an unlock screen (step 1). |
+| Claude after a restart | launchd starts the tmux session with Claude and the dev servers at boot, once the internet is back (step 10). |
 | The mini freezes | A smart plug you can switch from your phone: off and on again, and the mini boots. |
-| macOS updates | They restart the mini, so with FileVault on, install them yourself (step 14). |
+| macOS updates | The ones that need a restart wait for you, so they don't cut off a task (step 14). |
 | Home internet down | Nothing to do from afar; the mini is reachable again once the connection is back. |
 
-**FileVault with two homes:** I'd turn it off. The mini then always comes back by itself, and by design it holds
-nothing you can't revoke in minutes: a GitHub token limited to this repo and your Claude login. The cost is that a thief
-has an easier time getting at what's on it, so turn on Find My for your own account on the mini, which lets you lock or
-erase a stolen one. If you'd rather keep FileVault, step 16 lets you unlock it from the other city; it needs an Apple TV
-or Raspberry Pi that stays on at home.
+**FileVault is off,** because with it on, every power cut would stop at the unlock screen until someone types your
+password. By design the mini holds nothing you can't revoke in minutes: a GitHub token limited to this repo and your
+Claude login. The cost is that a thief has an easier time getting at what's on it, so Find My is on for your own
+account (step 1): it shows where the mini is, locks or erases it, and its Activation Lock stops anyone else from setting
+it up again.
 
 ---
 
 ## Part 2: Setup guide
 
 Placeholders: `<you>` is your admin account on the mini, `<tailnet>` is your Tailscale network name (shown in the
-admin console under DNS), `<home IP>` is the mini's fixed address on your home network (step 2), and `<repo>` is one of
-your repos. The guide names the mini `mini` and creates a second user, `agent`, which runs Claude.
+admin console under DNS), and `<repo>` is one of your repos. The guide names the mini `mini` and creates a second
+user, `agent`, which runs Claude.
 
 Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (step 4), then `setup-mac-mini.sh`
 (step 5). What they do is marked **Script** below; the rest is by hand.
@@ -235,11 +235,19 @@ Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (ste
 ### 1. First boot
 
 1. Go through macOS setup with your own account, `<you>`. It's the admin account, used only for setup and maintenance.
-2. **FileVault:** decide now (see [Using it from your other home](#using-it-from-your-other-home)). The simplest for two
-   homes is to skip it when macOS asks. If you turn it on, save the recovery key in your password manager and set up
-   step 16.
-3. Sign your own account into your Apple ID and turn on **Find My Mac** (System Settings → your name → iCloud → Find
-   My Mac), so a stolen mini can be located, locked or erased.
+2. **FileVault:** skip it when macOS asks, so the mini always comes back by itself after a power cut (see
+   [Using it from your other home](#using-it-from-your-other-home)). If it's on, `setup-mac-mini.sh` turns it off.
+3. **Find My,** so a stolen mini can be located, locked or erased:
+   - Location Services: `macos.sh` turns it on (step 4), or turn it on now in System Settings → Privacy & Security →
+     Location Services. The mini has no GPS: it works out where it is from the Wi-Fi networks around it, so
+     `setup-mac-mini.sh` keeps Wi-Fi on even with Ethernet.
+   - Sign your own account into your Apple Account, then turn off what iCloud syncs: the mini only needs Find My.
+   - Turn on **Find My Mac** (System Settings → your name → iCloud → Find My Mac), and allow it to use the mini's
+     location if it asks.
+
+   Find, lock or erase the mini at icloud.com/find, which works in your phone's browser, or in Find My on the MacBook.
+   If you skip this now, `setup-mac-mini.sh` opens System Settings for it at the end, and carries on by itself once
+   Find My is on.
 4. Install updates (System Settings → General → Software Update). From then on, `macos.sh` (step 4) has the mini
    download updates and install the ones that don't need a restart; the rest wait for you (step 14).
 5. **Script:** the machine is named `mini`. If you pick another name, avoid anything personal: once HTTPS is on, the
@@ -249,12 +257,21 @@ Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (ste
 
 - **Script:** the mini never sleeps, wakes on network access and restarts after a power cut. The firewall is on with
   stealth mode, and the built-in SSH server stays allowed.
-- System Settings → General → Sharing → **Remote Login**: on. Choose "Only these users" and add `<you>`;
-  `setup-mac-mini.sh` adds `agent`. Leave "Allow full disk access for remote users" off.
-- Screen Sharing is optional, for the rare times you need the desktop.
-- **Ethernet and a fixed address:** connect the mini by cable, and in your router give it a fixed address (a DHCP
-  reservation); that's `<home IP>`. Unlocking FileVault from the other city (step 16) needs both: one report found the
-  unlock works over Ethernet but not over Wi-Fi.
+- **Script:** Remote Login (System Settings → General → Sharing) is on, for "Only these users": `<you>` and `agent`.
+  Leave "Allow full disk access for remote users" off.
+- Screen Sharing stays off. For the rare times you need the desktop from afar, turn it on as `<you>` over SSH, and
+  off again when you're done:
+  ```sh
+  sudo launchctl enable system/com.apple.screensharing
+  sudo launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.screensharing.plist
+  # off again
+  sudo launchctl bootout system/com.apple.screensharing
+  sudo launchctl disable system/com.apple.screensharing
+  ```
+  The tailnet lets only SSH through to the mini, so connect through it from the MacBook:
+  `ssh -N -L 5901:localhost:5900 mini`, then `open vnc://localhost:5901` and log in as `<you>`.
+- **Ethernet:** connect the mini by cable if you can, it's steadier than Wi-Fi. **Script:** Wi-Fi stays on either
+  way, for Find My.
 - **For running it from afar:** plug the mini into a smart plug you can switch from your phone, and set the plug to
   turn back on after a power cut. A small UPS keeps the mini and the router running through short outages.
 
@@ -285,7 +302,7 @@ Download the dotfiles as a zip (see [README.md](README.md)), unzip them, and in 
      mini can't reach them. Port 22 is SSH, 5173–5180 are the dev servers, and the UDP range is Mosh.
      ```json
      {
-       "tagOwners": { "tag:mini": ["autogroup:admin"] },
+       "tagOwners": { "tag:mini": ["autogroup:owner", "autogroup:admin"] },
        "grants": [
          { "src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"] },
          { "src": ["autogroup:member"], "dst": ["tag:mini"], "ip": ["tcp:22", "tcp:5173-5180", "udp:60000-61000"] }
@@ -304,50 +321,14 @@ Download the dotfiles as a zip (see [README.md](README.md)), unzip them, and in 
 
 ### 6. SSH keys
 
-**MacBook.** Make a key just for the mini, with a passphrase:
-```sh
-ssh-keygen -t ed25519 -C "macbook → mini" -f ~/.ssh/id_ed25519_mini
-ssh-add --apple-use-keychain ~/.ssh/id_ed25519_mini   # remembers the passphrase in the keychain
-```
+**Script:** `setup-macbook.sh` makes a key just for the mini, with a passphrase, in `~/.ssh/id_ed25519_mini`, adds
+`ssh mini` (as `agent`) and `ssh mini-admin` (as `<you>`) to `~/.ssh/config`, and copies the public key to the
+clipboard. At its end, `setup-mac-mini.sh` asks for the public keys, one per line, and adds each to both users; it
+explains where to find them, including how to make the phone's key in Termius. To add keys later, run
+`./setup-mac-mini.sh` again.
 
-Add both users to `~/.ssh/config`:
-```
-Host mini
-  HostName mini.<tailnet>.ts.net
-  User agent
-  IdentityFile ~/.ssh/id_ed25519_mini
-  IdentitiesOnly yes
-  AddKeysToAgent yes
-  UseKeychain yes
-
-Host mini-admin
-  HostName mini.<tailnet>.ts.net
-  User <you>
-  IdentityFile ~/.ssh/id_ed25519_mini
-  IdentitiesOnly yes
-  AddKeysToAgent yes
-  UseKeychain yes
-```
-
-Copy the key to both accounts. Each asks for that account's password, for the last time:
-```sh
-for host in mini mini-admin; do
-  ssh "$host" 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys' < ~/.ssh/id_ed25519_mini.pub
-done
-```
-
-**Android.** In Termius, go to Keychain → Generate key, choose ed25519, and set a passphrase. Copy the public key, then
-add it to the mini from the MacBook:
-```sh
-ssh mini 'cat >> ~/.ssh/authorized_keys'   # paste the public key, press Enter, then Ctrl-D
-```
-In Termius, add a host: address `mini.<tailnet>.ts.net`, user `agent`, and that key.
-
-**Lock SSH to keys and to your tailnet.** Do this as `<you>` on the mini (`ssh mini-admin`), in the dotfiles folder.
-Keep that session open until the tests pass, so a mistake can't lock you out.
-```sh
-./setup-mac-mini.sh --lock-ssh
-```
+**Lock SSH to keys and to your tailnet.** Once both users have a key, the script runs `--lock-ssh` for you. Run it
+from a session you keep open until the tests pass, so a mistake can't lock you out.
 - It turns off password logins, which macOS allows by default, and root logins, and accepts `agent` and `<you>` only
   from Tailscale addresses.
 - Its file, `/etc/ssh/sshd_config.d/000-hardening.conf`, wins over Apple's own `100-macos.conf` thanks to the `000-`
@@ -372,21 +353,14 @@ token to it.
    - Repository access: only the repos the mini works on
    - Permissions: Contents read/write, Pull requests read/write
    - Expiration: 90 days
-2. On the mini, as `agent` (`ssh mini`):
-   ```sh
-   gh auth login        # choose GitHub.com, HTTPS, then "Paste an authentication token"
-   gh auth setup-git
-   ```
-   Homebrew is already on `agent`'s path, and its git name and email come from your `.gitconfig`.
+2. **Script:** `setup-mac-mini.sh` asks for the token, with these same steps, and logs `agent` in to `gh` with it.
+   `agent`'s git name and email come from your `.gitconfig`.
 
 ### 8. The repos
 
-As `agent`, clone each repo into `~/Code`:
-```sh
-cd ~/Code
-git clone https://github.com/marcofugaro/<repo>.git
-cd <repo> && npm ci
-```
+**Script:** `setup-mac-mini.sh` asks which repos to clone, then for each one clones it as `agent` into `~/Code`, runs
+`npm ci`, and starts its dev server in a tmux window named after the repo (step 10). To add repos later, run
+`./setup-mac-mini.sh` again.
 - If the repo has GPU tests, run them once through its lock, for example `node scripts/gpu-lock.js -- npm test`. It's
   the real check that SSH sessions get the mini's GPU.
 - **Ports:** each repo's dev server gets its own port from 5173 to 5180. Pin it in the repo's Vite config, so its
@@ -416,12 +390,9 @@ writes:
 - The rules for Claude on this machine, [CLAUDE.md](CLAUDE.md) followed by [CLAUDE-mac-mini.md](CLAUDE-mac-mini.md), in
   `~/.claude/CLAUDE.md` for both users, with your tailnet name filled in.
 
-By hand, as `agent`:
-```sh
-claude auth login    # your claude.ai account, not an API key
-claude doctor
-```
-- Over SSH, `claude auth login` prints a link: open it on the MacBook and paste the code back.
+**Script:** `setup-mac-mini.sh` runs `claude auth login` as `agent`, unless it's logged in already: open the link it
+prints, approve with your claude.ai account (not an API key), and paste the code back. Check it afterwards with
+`claude doctor` as `agent`.
 - SSH sessions can't unlock the keychain, so the login is saved in `~/.claude/.credentials.json`.
 - Don't use an API key: Remote Control only works with a claude.ai login.
 
@@ -439,16 +410,19 @@ From then on the two copies drift apart; treat the mini's as the main one.
 - `~/.tmux.conf`, with the mouse on and a long scrollback.
 - A few lines in `~/.zshrc` that land every SSH login in the tmux session `main`, like levelsio. They skip VS Code's
   own terminals.
-- `~/mini-up.sh`, which starts the main Claude session in tmux window `claude`, in `~/Code`, unless it's already
-  running, and a launchd job that runs it as `agent` at every boot. After a restart you can also run it yourself:
+- `~/mini-up.sh`, which waits for the internet, then starts the main Claude session in tmux window `claude`, in
+  `~/Code`, and each repo's dev server in a window named after the repo, skipping what's already running. A launchd
+  job runs it as `agent` at every boot, before anyone logs in, and every 5 minutes after, so Claude or a dev server
+  that stops comes back. To stop a dev server for good, move its repo out of `~/Code`. You can also run it yourself:
   `zsh -l ~/mini-up.sh`.
 
-Start each repo's dev server in its own window, named after the repo. It keeps running after you disconnect:
+The script starts the dev servers of the repos it clones. To start one yourself, in its own window named after the
+repo, which keeps running after you disconnect:
 ```sh
 tmux new-window -t main -n <repo> -c ~/Code/<repo> "npm run dev"
 ```
 
-Check the boot job once with a restart (`sudo reboot`, or `sudo fdesetup authrestart` with FileVault on):
+Check the boot job once with a power cut: switch the smart plug off and on, or run `sudo reboot`.
 1. About a minute later the main session should appear in the Claude app, and `ssh mini` should land in the tmux
    session.
 2. Run a repo's GPU tests in it. A tmux started by launchd at boot runs outside any login, and I couldn't confirm that
@@ -509,19 +483,10 @@ tailnet address, where only your devices can reach it. Open a repo's dev server 
   the Tailscale daemon, which Homebrew doesn't update. Restarting Tailscale can drop SSH sessions over it for a moment.
   Claude Code updates itself (check with `claude doctor`).
 - **macOS updates:** the mini downloads them by itself and installs the ones that don't need a restart. Install the
-  rest when it suits you: `sudo softwareupdate --install --all --restart`. With FileVault on, first make the next
-  restart skip the FileVault screen:
-  ```sh
-  sudo fdesetup authrestart -delayminutes -1
-  sudo softwareupdate --install --all --restart
-  ```
-  Apple notes the skip "may not work on all systems", so try it once while you're at the main home.
-- **Planned restart:** `sudo reboot`. With FileVault on, use `sudo fdesetup authrestart` instead, which restarts
-  without stopping at the FileVault screen.
-- **Power cut:** the mini starts again when power returns, and launchd brings back the main Claude session (step 10);
-  restart the dev servers yourself. With FileVault on, it first waits at the unlock screen. macOS 26 can unlock it over
-  SSH, but only at its home network address and only with your password: `ssh <you>@<home IP>`. From the main home
-  that works directly; from the other city it goes through the Apple TV or Raspberry Pi (step 16).
+  rest when it suits you: `sudo softwareupdate --install --all --restart`.
+- **Planned restart:** `sudo reboot`.
+- **Power cut:** the mini starts again when power returns, and launchd brings back the main Claude session and the dev
+  servers once the internet is back (step 10).
 - **Frozen mini:** switch the smart plug off and on from its app; the mini boots when power returns.
 - **Lost phone:**
   1. In the Tailscale admin console, remove the phone under Machines. Access stops immediately.
@@ -537,34 +502,11 @@ through reboots with nobody logged in, and Claude can change the colors and anim
 [yeelight-cube/README.md](yeelight-cube/README.md). Once the cube is on your Wi-Fi with a fixed address, run
 `./setup-mac-mini-status-lamp.sh` as `<you>` in the dotfiles folder to install it.
 
-### 16. Only with FileVault: unlocking it from the other city
-
-After a restart, the FileVault unlock happens before Tailscale starts, so the mini is reachable only at its home
-network address. A device at home that stays on and runs Tailscale can route you onto that network from anywhere.
-
-1. **The routing device:** an Apple TV or a Raspberry Pi, always on, on the same network as the mini. Have it advertise
-   your home range, for example `192.168.1.0/24`:
-   - Apple TV: install Tailscale, sign in, then Subnet Router → Advertise New Route.
-   - Raspberry Pi: install Tailscale, turn on IP forwarding as Tailscale's
-     [subnet router guide](https://tailscale.com/kb/1406/quick-guide-subnets) shows, then
-     `sudo tailscale up --advertise-routes=192.168.1.0/24`.
-2. **Approve the route** in the admin console: Machines → the device → Edit route settings.
-3. **Allow it** in the access policy, next to the other grants:
-   `{ "src": ["autogroup:member"], "dst": ["192.168.1.0/24"], "ip": ["tcp:22"] }`.
-4. **Check the ranges differ:** if your other home's router also uses `192.168.1.x`, change one of them, or the route
-   won't work from there.
-5. **Test it once** from outside the home network (at the other home, or with the MacBook on your phone's hotspot):
-   restart the mini with `sudo reboot`, run `ssh <you>@<home IP>` and type your password. macOS drops the connection
-   while it finishes starting; a minute later `ssh mini` works and the main session is back in the Claude app.
-
-The routing device comes back on its own after a power cut too, and the Tailscale app on the MacBook uses approved
-routes automatically.
-
 ### Checklist
 
 - [ ] Work pushed
-- [ ] FileVault decided (off, or on with step 16 tested); Find My on; updates installed
-- [ ] Ethernet with a fixed home address; smart plug that turns back on after a power cut; UPS if you have one
+- [ ] FileVault off; Location Services and Find My on, with the mini on the map at icloud.com/find; updates installed
+- [ ] Ethernet if you can, Wi-Fi left on; smart plug that turns back on after a power cut; UPS if you have one
 - [ ] Tailscale console: policy set, device approval on, MagicDNS and HTTPS certificates on, no Funnel
 - [ ] `setup.sh` and `setup-mac-mini.sh` run; the mini approved in Tailscale; Remote Login on
 - [ ] SSH keys from the MacBook and the phone; `--lock-ssh` run and password logins refused
@@ -594,10 +536,7 @@ routes automatically.
   [permission modes](https://code.claude.com/docs/en/permission-modes),
   [managed settings](https://code.claude.com/docs/en/managed-settings)
 - Tailscale: [Serve](https://tailscale.com/kb/1312/serve), [Funnel](https://tailscale.com/kb/1223/funnel),
-  [macOS variants](https://tailscale.com/kb/1065/macos-variants), [device approval](https://tailscale.com/kb/1099/device-approval),
-  [subnet routers](https://tailscale.com/docs/features/subnet-routers), [Apple TV](https://tailscale.com/docs/install/appletv)
-- Authenticated restarts: `man fdesetup` (`authrestart -delayminutes -1`) on macOS 26
-- Apple, FileVault unlock over SSH: [What's new for enterprise in macOS Tahoe 26](https://support.apple.com/en-us/124963)
+  [macOS variants](https://tailscale.com/kb/1065/macos-variants), [device approval](https://tailscale.com/kb/1099/device-approval)
 - levelsio: [Termius 50-50](https://x.com/levelsio/status/2074603112225235241),
   [MacinCloud build](https://x.com/levelsio/status/2074618835282649594),
   [serve-sim](https://x.com/levelsio/status/2075328941317886210),

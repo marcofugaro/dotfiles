@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Stop the whole script on Ctrl+C, even when the interrupted command catches it
+trap 'exit 130' INT
+
+# Say so whenever sudo stops for the admin password
+export SUDO_PROMPT='Waiting for your admin password, for sudo: '
+
 # Expand save panel by default
 defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode -bool true
 defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2 -bool true
@@ -40,6 +46,10 @@ sudo defaults write /Library/Preferences/com.apple.commerce AutoUpdate -bool tru
 sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticallyInstallMacOSUpdates -bool false
 sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall -bool false
 
+# Location Services on, which Find My uses to locate the Mac
+sudo defaults write /var/db/locationd/Library/Preferences/ByHost/com.apple.locationd LocationServicesEnabled -bool true
+sudo killall locationd
+
 # Disable the right-edge trackpad swipe for Notification Centre
 defaults write com.apple.AppleMultitouchTrackpad.plist TrackpadTwoFingerFromRightEdgeSwipeGesture -bool false
 
@@ -64,15 +74,7 @@ killall cfprefsd
 # Dock                                                                        #
 ###############################################################################
 
-# Set the Dock apps
-dock_item() {
-    printf '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>%s</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>' "$1"
-}
-
-defaults write com.apple.dock persistent-apps -array \
-    "$(dock_item /Applications/Google\ Chrome.app)" \
-    "$(dock_item /Applications/Visual\ Studio\ Code.app)" \
-    "$(dock_item /Applications/Tabby.app)"
+# The Dock apps are set in each machine's setup script
 
 # Hide recent apps in the Dock
 defaults write com.apple.dock "show-recents" -bool "false"

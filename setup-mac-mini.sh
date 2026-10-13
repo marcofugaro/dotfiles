@@ -1,10 +1,21 @@
 #!/bin/bash
 
-# Mac mini setup: run from the admin account, after setup.sh.
+# Stop the whole script on Ctrl+C, even when the interrupted command catches it
+trap 'exit 130' INT
+
+# Say so whenever sudo stops for the admin password
+export SUDO_PROMPT='Waiting for your admin password, for sudo: '
+
+# Ask for it once, and keep sudo from asking again while the script waits for you
+sudo -v
+while kill -0 "$$" 2> /dev/null; do sudo -n true; sleep 60; done 2> /dev/null &
+
+# Mac mini setup: run at the mini itself, from the admin account, after setup.sh.
 # Before running it, in the Tailscale admin console: save the access policy that owns tag:mini, and turn on
 # MagicDNS and HTTPS certificates (README-mac-mini.md, step 5).
-# Afterwards:
-#   ./setup-mac-mini.sh --lock-ssh   once the SSH keys are added, allows only key logins from the tailnet
+# At the end it turns FileVault off, then asks for Find My, the SSH keys, the Claude and GitHub logins and the repos,
+# explaining each and skipping what's done, so run it again to add keys or repos.
+#   ./setup-mac-mini.sh --lock-ssh   allows only key logins from the tailnet, done for you once both users have a key
 #   ./setup-mac-mini.sh --update     updates Homebrew packages and refreshes what they leave behind
 # The other manual steps are in README-mac-mini.md.
 
@@ -17,7 +28,7 @@ allow_mosh() {
 }
 
 # SSH with keys only, from the tailnet only
-if [[ "$1" == "--lock-ssh" ]]; then
+lock_ssh() {
   sudo tee /etc/ssh/sshd_config.d/000-hardening.conf > /dev/null <<EOF
 PasswordAuthentication no
 KbdInteractiveAuthentication no
@@ -25,23 +36,68 @@ PermitRootLogin no
 AuthenticationMethods publickey
 AllowUsers agent@100.64.0.0/10 agent@fd7a:115c:a1e0::/48 $(whoami)@100.64.0.0/10 $(whoami)@fd7a:115c:a1e0::/48
 EOF
-  sudo sshd -t && echo "SSH config OK, test it from a new connection before closing this one"
+  sudo sshd -t && echo "SSH locked to keys and the tailnet: test it from a new connection before closing this one"
+}
+
+if [[ "$1" == "--lock-ssh" ]]; then
+  lock_ssh
   exit
 fi
+
+# Install the Tailscale daemon that starts at boot, unless it's Homebrew's current one already: installing restarts
+# Tailscale, which can drop SSH sessions over it for a moment
+install_tailscaled() {
+  [ -e /Library/LaunchDaemons/com.tailscale.tailscaled.plist ] &&
+    cmp -s "$(brew --prefix)/bin/tailscaled" /usr/local/bin/tailscaled && return
+  sudo tailscaled install-system-daemon
+}
 
 # Update, then re-allow Mosh and reinstall the Tailscale daemon, which brew upgrade leaves on the old version
 # Restarting Tailscale can drop SSH sessions over it for a moment, so run it in tmux
 if [[ "$1" == "--update" ]]; then
   brew update && brew upgrade
   allow_mosh
-  sudo tailscaled install-system-daemon
+  install_tailscaled
   [ -e /Library/LaunchDaemons/local.claude-cube.plist ] && ./setup-mac-mini-status-lamp.sh --update
   exit
 fi
 
-# Run a command as agent, in its own home
+# Run a command as agent, from / since it can't enter the private admin home
 as_agent() {
-  sudo -H -u agent "$@"
+  (cd / && sudo -H -u agent "$@")
+}
+
+# The mini's MagicDNS name, like mini.<tailnet>.ts.net
+tailnet_host() {
+  tailscale status --json 2> /dev/null | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2> /dev/null || echo 'mini.<tailnet>.ts.net'
+}
+
+# Show what to do by hand, then wait for Enter
+wait_for() {
+  echo
+  echo "$1"
+  read -r -p "Waiting for you: press Enter when done. "
+}
+
+# Add a public key to both users' authorized_keys, once
+add_key() {
+  ssh-keygen -l -f /dev/stdin <<< "$1" &> /dev/null || { echo "That's not a public key, skipped"; return; }
+  for user in "$(whoami)" agent; do
+    (cd / && sudo -H -u "$user" bash -c 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys &&
+      chmod 600 ~/.ssh/authorized_keys && { grep -qxF "$1" ~/.ssh/authorized_keys || echo "$1" >> ~/.ssh/authorized_keys; }' _ "$1")
+  done
+  echo "Added for $(whoami) and agent"
+}
+
+# Clone a repo for agent into ~/Code and install it
+add_repo() {
+  as_agent zsh -lc '
+    cd ~/Code || exit 1
+    name="${1##*/}"
+    [ -d "$name" ] || gh repo clone "$1" || exit 1
+    cd "$name"
+    [ ! -e package-lock.json ] || npm ci
+  ' _ "$1"
 }
 
 # Name the machine
@@ -49,8 +105,12 @@ sudo scutil --set ComputerName mini
 sudo scutil --set HostName mini
 sudo scutil --set LocalHostName mini
 
-# Never sleep, wake on network access, restart after a power cut
-sudo pmset -a sleep 0 disksleep 0 womp 1 autorestart 1
+# Never sleep, wake on network access, start up whenever power returns
+sudo pmset -a sleep 0 disksleep 0 womp 1 autorestart 1 autorestartatconnect 1
+
+# Wi-Fi on even with Ethernet, since Find My locates the mini from the networks around it
+wifi="$(networksetup -listallhardwareports | awk '/Wi-Fi/ { getline; print $2 }')"
+[ -n "$wifi" ] && sudo networksetup -setairportpower "$wifi" on
 
 # Firewall with stealth mode, the built-in SSH server stays allowed
 sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
@@ -58,6 +118,15 @@ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
 
 # Make the admin home folder private
 sudo chmod 700 "$HOME"
+
+# Set the Dock apps, after Finder
+dock_item() {
+  printf '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>%s</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>' "$1"
+}
+defaults write com.apple.dock persistent-apps -array \
+  "$(dock_item /System/Applications/Utilities/Terminal.app)" \
+  "$(dock_item /System/Applications/System\ Settings.app)"
+killall Dock
 
 # Install tmux, Mosh and the Tailscale daemon
 brew install tmux mosh tailscale
@@ -67,9 +136,20 @@ brew install --cask blender
 
 allow_mosh
 
-# Start Tailscale at boot, then approve the device from the link it prints
-sudo tailscaled install-system-daemon
-sudo tailscale up --hostname=mini --advertise-tags=tag:mini
+# Start Tailscale at boot, then approve the device from the link it prints, unless it's connected already
+install_tailscaled
+if ! tailscale status &> /dev/null; then
+  echo "Waiting for you to approve the mini: open the link Tailscale prints, signed in as the tailnet's owner"
+  if ! sudo tailscale up --hostname=mini --advertise-tags=tag:mini; then
+    cat <<'EOF'
+
+Tailscale refused the login. If it says tag:mini is invalid or not permitted, save the access policy with
+"tagOwners": { "tag:mini": ["autogroup:owner", "autogroup:admin"] } in the admin console (README-mac-mini.md,
+step 5), approve the link signed in as the tailnet's owner or an admin, then run this script again.
+EOF
+    exit 1
+  fi
+fi
 
 # Publish the dev servers on ports 5173–5180, one per repo, to the tailnet only, each at https://<mini>:<port>
 for port in {5173..5180}; do
@@ -77,8 +157,7 @@ for port in {5173..5180}; do
 done
 
 # This machine's rules for Claude Code, with its tailnet address
-mini_host="$(tailscale status --json 2> /dev/null | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2> /dev/null)"
-[ -n "$mini_host" ] || mini_host='mini.<tailnet>.ts.net'
+mini_host="$(tailnet_host)"
 claude_md="$(cat CLAUDE.md; echo; sed "s/mini\.<tailnet>\.ts\.net/$mini_host/" CLAUDE-mac-mini.md)"
 printf "%s\n" "$claude_md" > ~/.claude/CLAUDE.md
 
@@ -88,14 +167,21 @@ printf "%s\n" "$claude_md" > ~/.claude/CLAUDE.md
 ###############################################################################
 
 # Create it, asking for its password
-id agent &>/dev/null || sudo sysadminctl -addUser agent -fullName agent -password -
+if ! id agent &> /dev/null; then
+  echo "Waiting for a password for the new agent user"
+  sudo sysadminctl -addUser agent -fullName agent -password -
+fi
 sudo createhomedir -c -u agent > /dev/null
 
-# Allow it to log in over SSH
+# Remote Login for only you and agent: the access group is what "Only these users" lists
+sudo dseditgroup -o read com.apple.access_ssh &> /dev/null || sudo dseditgroup -o create -q com.apple.access_ssh
+sudo dseditgroup -o edit -a "$(whoami)" -t user com.apple.access_ssh
 sudo dseditgroup -o edit -a agent -t user com.apple.access_ssh
+sudo launchctl enable system/com.openssh.sshd
+sudo launchctl print system/com.openssh.sshd &> /dev/null || sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist
 
 # Install Claude Code in its home, where it updates itself
-as_agent bash -c 'cd ~ && curl -fsSL https://claude.ai/install.sh | bash'
+as_agent test -x /Users/agent/.local/bin/claude || as_agent bash -c 'cd ~ && curl -fsSL https://claude.ai/install.sh | bash'
 
 # The same dotfiles as the admin
 for file in .zshrc .vimrc .gitconfig .gitignore; do
@@ -123,22 +209,34 @@ set -g mouse on
 set -g history-limit 100000
 EOF
 
-# Starts Claude in tmux unless it's running, launchd runs it at boot
+# Starts Claude and the dev servers in tmux unless they're running, launchd runs it at boot and every 5 minutes
 as_agent mkdir -p /Users/agent/Code
 as_agent tee /Users/agent/mini-up.sh > /dev/null <<'EOF'
 #!/bin/zsh -l
-# Starts the main Claude session in tmux, unless it's already running.
-# launchd runs it at boot; after a restart you can also run it yourself: zsh -l ~/mini-up.sh
+# Starts the main Claude session in tmux, and each repo's dev server in a window named after it, unless running.
+# launchd runs it at boot and every 5 minutes; you can also run it yourself: zsh -l ~/mini-up.sh
 cd ~/Code || exit 1
-tmux has-session -t main 2>/dev/null && exit 0
 
-# At boot the network can take a moment to come up, and Claude needs it
-for i in {1..24}; do
-  curl -sS -m 5 -o /dev/null https://api.anthropic.com && break
-  sleep 5
+# After a power cut the router can take minutes to come back, and Claude needs the internet
+until curl -sS -m 5 -o /dev/null https://api.anthropic.com; do
+  sleep 10
 done
 
-tmux new-session -d -s main -n claude -c "$PWD" "$HOME/.local/bin/claude -n main"
+# Open a window in the main session, unless one with that name is there
+start() {
+  if ! tmux has-session -t main 2>/dev/null; then
+    tmux new-session -d -s main -n "$1" -c "$2" "$3"
+  elif ! tmux list-windows -t main -F '#W' | grep -qxF "$1"; then
+    tmux new-window -d -t main -n "$1" -c "$2" "$3"
+  fi
+}
+
+start claude ~/Code "$HOME/.local/bin/claude -n main"
+for dir in ~/Code/*(/N); do
+  if grep -q '"dev":' "$dir/package.json" 2>/dev/null; then
+    start "${dir:t}" "$dir" "npm run dev"
+  fi
+done
 EOF
 
 # Claude Code settings and instructions
@@ -150,7 +248,8 @@ as_agent mkdir -p /Users/agent/.claude
   "agentPushNotifEnabled": true,
   "dialogExpiry": "never",
   "modelSettings": { "claude-opus-5-5": { "effortLevel": "xhigh" } },
-  "permissions": { "defaultMode": "auto" }
+  "permissions": { "defaultMode": "auto" },
+  "worktree": { "bgIsolation": "none" }
 }
 EOF
 printf "%s\n" "$claude_md" | as_agent tee /Users/agent/.claude/CLAUDE.md > /dev/null
@@ -174,7 +273,7 @@ EOF
 sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
 sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 
-# Run mini-up.sh as agent at every boot
+# Run mini-up.sh as agent at every boot and every 5 minutes, so what stops comes back
 sudo tee /Library/LaunchDaemons/local.mini-up.plist > /dev/null <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -201,6 +300,8 @@ sudo tee /Library/LaunchDaemons/local.mini-up.plist > /dev/null <<'EOF'
   </dict>
   <key>RunAtLoad</key>
   <true/>
+  <key>StartInterval</key>
+  <integer>300</integer>
   <key>AbandonProcessGroup</key>
   <true/>
   <key>StandardOutPath</key>
@@ -212,14 +313,105 @@ sudo tee /Library/LaunchDaemons/local.mini-up.plist > /dev/null <<'EOF'
 EOF
 sudo chown root:wheel /Library/LaunchDaemons/local.mini-up.plist
 sudo chmod 644 /Library/LaunchDaemons/local.mini-up.plist
-sudo launchctl print system/local.mini-up &> /dev/null || sudo launchctl bootstrap system /Library/LaunchDaemons/local.mini-up.plist
+# Reloaded every run, so a changed plist takes effect; tmux keeps running
+sudo launchctl bootout system/local.mini-up 2> /dev/null
+sudo launchctl bootstrap system /Library/LaunchDaemons/local.mini-up.plist
+
+
+###############################################################################
+# Keys and logins, which only you can provide                                 #
+###############################################################################
+
+# FileVault off, so the mini comes back by itself after a power cut instead of waiting at the unlock screen
+if fdesetup isactive &> /dev/null; then
+  echo
+  echo "Turning FileVault off. Waiting for your user name and password:"
+  sudo fdesetup disable
+fi
+
+# Find My, to locate, lock or erase a stolen mini. The Apple Account sign-in has no command, so open its settings
+# and carry on once Find My is on; macos.sh turns on Location Services
+if ! nvram fmm-mobileme-token-FMM &> /dev/null; then
+  open "x-apple.systempreferences:com.apple.systempreferences.AppleIDSettings"
+  cat <<'EOF'
+
+Find My, in the System Settings window that just opened:
+1. Sign in with your Apple Account, then turn off what iCloud syncs: the mini only needs Find My
+2. iCloud → Find My Mac: turn it on, and allow it the mini's location if it asks
+EOF
+  echo "Waiting for Find My Mac to turn on, or press Enter to skip"
+  until nvram fmm-mobileme-token-FMM &> /dev/null || read -r -t 5; do :; done
+  if nvram fmm-mobileme-token-FMM &> /dev/null; then
+    echo "Find My is on: check from your phone at icloud.com/find that the mini is on the map"
+  else
+    echo "Find My skipped: run this script again to turn it on"
+  fi
+fi
+
+# SSH keys for both users, then SSH locked to them
+cat <<'EOF'
+
+Waiting for SSH keys, for both your account and agent. Paste one public key per line, then an empty line:
+- MacBook: setup-macbook.sh left it in the clipboard; copy it again with: pbcopy < ~/.ssh/id_ed25519_mini.pub
+- Phone: in Termius, Keychain → + → Generate key, type ed25519, with a passphrase. Open the key and copy its public key.
+EOF
+while read -r -p "> " key && [ -n "$key" ]; do
+  add_key "$key"
+done
+
+# Locked once both users have a key, unless it is already
+if [ ! -e /etc/ssh/sshd_config.d/000-hardening.conf ]; then
+  if [ -s ~/.ssh/authorized_keys ] && sudo test -s /Users/agent/.ssh/authorized_keys; then
+    lock_ssh
+    wait_for "Test SSH, now limited to keys and the tailnet:
+- MacBook: ssh mini 'echo key login works', then ssh -o PubkeyAuthentication=no mini, which must fail with \"Permission denied\"
+- Phone: in Termius, add a host with address $mini_host, user agent and the key you made, then connect
+If a test fails, run sudo rm /etc/ssh/sshd_config.d/000-hardening.conf to allow passwords again, and check the keys."
+  else
+    echo "SSH stays open to passwords until both users have a key: run this script again to add them"
+  fi
+fi
+
+# Claude login for agent
+if ! as_agent zsh -lc '~/.local/bin/claude auth status' &> /dev/null; then
+  echo
+  echo "Waiting for the Claude login for agent: open the link it prints, approve with your claude.ai account, and paste the code back here."
+  as_agent zsh -lc 'cd ~ && ~/.local/bin/claude auth login'
+  # The boot job may have started Claude before the login, restart it logged in
+  as_agent zsh -lc 'tmux respawn-window -k -t main:claude' 2> /dev/null
+fi
+
+# GitHub login for agent, with a token of its own
+if ! as_agent zsh -lc 'gh auth status' &> /dev/null; then
+  cat <<'EOF'
+
+GitHub for agent, with a token of its own:
+1. On github.com: Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token
+2. Expiration: 90 days. Repository access: only the repos the mini works on.
+3. Permissions → Repository permissions: Contents read and write, Pull requests read and write
+4. Generate it and copy the token
+EOF
+  read -r -s -p "Waiting for the token, paste it (hidden): " token
+  echo
+  printf '%s\n' "$token" | as_agent zsh -lc 'gh auth login --with-token'
+  unset token
+fi
+# Git over HTTPS with that login, set again each run since the dotfiles above replace ~/.gitconfig
+as_agent zsh -lc 'gh auth status &> /dev/null && gh auth setup-git'
+
+# The repos, each with its dev server running
+echo
+read -r -p "Waiting for the repos to clone into agent's ~/Code, space-separated (name or owner/name), empty to skip: " repos
+for repo in $repos; do
+  add_repo "$repo"
+done
+if [ -n "$repos" ]; then
+  as_agent zsh -l /Users/agent/mini-up.sh
+  echo "Their dev servers are running, each in the tmux window named after its repo"
+fi
 
 cat <<'EOF'
 
-Done. Still to do by hand (README-mac-mini.md):
-1. Turn on Remote Login, for "Only these users" (step 2)
-2. Add the SSH keys from the MacBook and the phone to both users (step 6)
-3. Lock SSH to keys and the tailnet: ./setup-mac-mini.sh --lock-ssh
-4. Log in to Claude as agent: ssh mini, then claude auth login (step 9)
-5. Log in to GitHub as agent with its token, clone your repos, and start their dev servers (steps 7, 8 and 10)
+Done. What's left is in README-mac-mini.md: pin each repo's dev server port in its Vite config (step 8), bring your
+Claude memory over from the MacBook (step 9), and check the boot job with a power cut (step 10).
 EOF

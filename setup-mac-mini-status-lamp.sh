@@ -1,8 +1,19 @@
 #!/bin/bash
 
+# Stop the whole script on Ctrl+C, even when the interrupted command catches it
+trap 'exit 130' INT
+
+# Say so whenever sudo stops for the admin password
+export SUDO_PROMPT='Waiting for your admin password, for sudo: '
+
 # Yeelight Cube status lamp for the Mac mini: run from the admin account, after setup-mac-mini.sh.
 # First put the cube on your Wi-Fi with a fixed address (yeelight-cube/README.md, step 1).
 #   ./setup-mac-mini-status-lamp.sh --update   re-allows Node through the firewall after brew upgrade moves it
+
+# Run a command as agent, from / since it can't enter the private admin home
+as_agent() {
+  (cd / && sudo -H -u agent "$@")
+}
 
 # Let Node through the firewall, for the connection the cube opens back to animate
 allow_node() {
@@ -24,8 +35,8 @@ lamp_dir=/Users/agent/.claude/yeelight-cube
 sudo install -d -o agent -g staff "$lamp_dir"
 sudo install -o agent -g staff -m 644 yeelight-cube/cube.mjs yeelight-cube/lamp-hook.sh yeelight-cube/cube.example.json "$lamp_dir/"
 if [ ! -e "$lamp_dir/cube.json" ]; then
-  read -p "The cube's IP address: " cube_ip
-  sed "s/\"ip\": \"[^\"]*\"/\"ip\": \"$cube_ip\"/" yeelight-cube/cube.example.json | sudo -H -u agent tee "$lamp_dir/cube.json" > /dev/null
+  read -p "Waiting for the cube's IP address: " cube_ip
+  sed "s/\"ip\": \"[^\"]*\"/\"ip\": \"$cube_ip\"/" yeelight-cube/cube.example.json | as_agent tee "$lamp_dir/cube.json" > /dev/null
   nc -z -w 3 "$cube_ip" 55443 && echo "The cube is reachable" || echo "Can't reach the cube: check its address and LAN Control"
   echo "If it's more than one Panel, list its modules in $lamp_dir/cube.json (yeelight-cube/README.md, step 3)"
 fi
@@ -67,7 +78,7 @@ else
 fi
 
 # Add the lamp's hooks to agent's Claude Code settings, next to any others
-sudo -H -u agent bash -c 'cd ~ && python3 -I -' <<'EOF'
+as_agent bash -c 'cd ~ && python3 -I -' <<'EOF'
 import json, os
 
 path = os.path.expanduser('~/.claude/settings.json')

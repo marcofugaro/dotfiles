@@ -9,8 +9,9 @@ another city.
 - Claude normally runs as `agent`, a standard user without admin rights. Either way, don't use `sudo`: when something
   needs an admin (Homebrew installs and upgrades, the firewall, launchd, Tailscale, SSH), give me the exact command to
   run from my admin account instead of trying a workaround.
-- tmux session `main` holds the main Claude session (window `claude`), which launchd starts at boot with
-  `~/mini-up.sh`, and one window per dev server, named after its repo.
+- tmux session `main` holds the main Claude session (window `claude`) and one window per dev server, named after its
+  repo. launchd starts them all at boot with `~/mini-up.sh`, and every 5 minutes restarts any that stopped, so
+  restart a dev server in its own window (`tmux respawn-window -k -t main:<repo>`) rather than starting another.
 
 ## Talking to me
 

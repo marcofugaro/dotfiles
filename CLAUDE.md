@@ -45,9 +45,14 @@ IMPORTANT: please make the comments concise and timeless.
 
 ## Keeping the setup reproducible
 
-My dotfiles repo, `~/Code/dotfiles`, rebuilds a machine from scratch. Whenever you change something globally on this
-machine (a Homebrew or npm package, an app, a macOS default, a shell or git setting, a font, a dotfile in `~`), make the
-same change in the configuration scripts there too: `setup.sh` for installs and file copies on every Mac,
-`setup-mac-mini.sh` and `setup-macbook.sh` for what only one machine needs, `macos.sh` for macOS defaults, and the
-dotfiles in that repo (`.zshrc`, `.gitconfig`, ...) for shell and git config. Remove from them whatever you uninstall
-or stop using. Tell me which script you edited.
+My dotfiles repo, `~/Code/dotfiles`, rebuilds a machine from scratch. Whenever something changes globally on this
+machine, whether you change it or give me the command (a Homebrew or npm package, an app, a macOS default or system
+setting, a shell or git setting, a font, a dotfile in `~`), make the same change in the configuration scripts there too:
+`setup.sh` for installs and file copies on every Mac, `setup-mac-mini.sh` and `setup-macbook.sh` for what only one
+machine needs, `macos.sh` for macOS defaults and system settings, and the dotfiles in that repo (`.zshrc`,
+`.gitconfig`, ...) for shell and git config. Remove from them whatever you uninstall or stop using. Tell me which
+script you edited.
+
+Automate everything you can. For a setting, find its command (`defaults`, `pmset`, `launchctl`, `networksetup`, ...),
+put it in the scripts and give it to me to run, rather than steps to click through in System Settings. Leave a step by
+hand only when there's no command for it, like signing in to an Apple Account, and say so.

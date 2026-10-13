@@ -2,6 +2,8 @@
 # Works out the Claude Code status for the Yeelight Cube from hook events. Across all sessions on this machine the
 # most urgent state wins: input, then working, then idle, then off. cube.mjs animates whatever is in .state.
 #   lamp-hook.sh <working|idle|input|off>   (the hook event's JSON arrives on stdin)
+# Stop the whole script on Ctrl+C, even when the interrupted command catches it
+trap 'exit 130' INT
 DIR=/tmp/claude-lamp
 mkdir -p "$DIR"
 
