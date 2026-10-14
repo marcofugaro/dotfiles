@@ -4,14 +4,14 @@
 trap 'exit 130' INT
 
 # Say so whenever sudo stops for the admin password
-export SUDO_PROMPT='Waiting for your admin password, for sudo: '
+export SUDO_PROMPT='Please enter your admin password, for sudo: '
 
 # Setup for every Mac, before its own setup script. Safe to run again: it skips what's done.
 
 # Generate an SSH key for GitHub, unless there's one; skip it on Macs that shouldn't hold your personal key
-[ -e ~/.ssh/id_ed25519 ] || read -p "Waiting for your answer: generate an SSH key for GitHub? [y/N] " ssh_key
+[ -e ~/.ssh/id_ed25519 ] || read -p "Please answer: generate an SSH key for GitHub? [y/N] " ssh_key
 if [[ "$ssh_key" == [yY] ]]; then
-  echo "Waiting for you: press Enter to keep the key's default location, then choose a passphrase"
+  echo "Please press Enter to keep the key's default location, then choose a passphrase"
   ssh-keygen -t ed25519
   eval "$(ssh-agent -s)"
   cat >> ~/.ssh/config <<'EOF'
@@ -20,34 +20,41 @@ Host github.com
   UseKeychain yes
   IdentityFile ~/.ssh/id_ed25519
 EOF
-  echo "Waiting for the key's passphrase, to remember it in the keychain"
+  echo "Please enter the key's passphrase again, to remember it in the keychain"
   ssh-add --apple-use-keychain ~/.ssh/id_ed25519
   pbcopy < ~/.ssh/id_ed25519.pub
-  read -p "Waiting for you: the public key is in the clipboard, add it at https://github.com/settings/ssh/new, then press Enter "
+  read -p "Please add the public key, now in the clipboard, at https://github.com/settings/ssh/new, then press Enter "
 fi
 
 # Install Homebrew
 if [ ! -x /opt/homebrew/bin/brew ]; then
-  echo "Waiting for the Homebrew installer: it asks for your admin password, then for Enter to continue"
+  echo "Please enter your admin password when the Homebrew installer asks for it, then press Enter to continue"
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+# Install Homebrew packages, unless installed already, so a rerun doesn't upgrade them
+brew_install() {
+  for package in "$@"; do
+    brew list "$package" &> /dev/null || brew install "$package"
+  done
+}
+
 
 # Install GNU core utilities
-brew install coreutils
+brew_install coreutils
 
 # Install a newer python
-brew install python
+brew_install python
 
 # Install commands
-brew install node diff-so-fancy tree gh ghostscript bat
+brew_install node diff-so-fancy tree gh ghostscript bat
 
 # Install npm global commands
 command -v fkill > /dev/null || npm install --global fkill-cli
 
 # Touch ID for sudo, in tmux too
-brew install pam-reattach
+brew_install pam-reattach
 sudo tee /etc/pam.d/sudo_local > /dev/null <<EOF
 auth       optional       $(brew --prefix)/lib/pam/pam_reattach.so
 auth       sufficient     pam_tid.so
@@ -91,7 +98,7 @@ PY
 
 # Make zsh the default shell
 if [[ "$(dscl . -read "/Users/$(whoami)" UserShell)" != *" /bin/zsh" ]]; then
-  echo "Waiting for your password, to change the shell"
+  echo "Please enter your password, to change the shell"
   chsh -s /bin/zsh
 fi
 

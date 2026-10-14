@@ -4,7 +4,7 @@
 trap 'exit 130' INT
 
 # Say so whenever sudo stops for the admin password
-export SUDO_PROMPT='Waiting for your admin password, for sudo: '
+export SUDO_PROMPT='Please enter your admin password, for sudo: '
 
 # Yeelight Cube status lamp for the Mac mini: run from the admin account, after setup-mac-mini.sh.
 # First put the cube on your Wi-Fi with a fixed address (yeelight-cube/README.md, step 1). Safe to run again.
@@ -35,10 +35,10 @@ lamp_dir=/Users/agent/.claude/yeelight-cube
 sudo install -d -o agent -g staff "$lamp_dir"
 sudo install -o agent -g staff -m 644 yeelight-cube/cube.mjs yeelight-cube/lamp-hook.sh yeelight-cube/cube.example.json "$lamp_dir/"
 if [ ! -e "$lamp_dir/cube.json" ]; then
-  read -p "Waiting for the cube's IP address: " cube_ip
+  read -p "Please enter the cube's IP address: " cube_ip
   sed "s/\"ip\": \"[^\"]*\"/\"ip\": \"$cube_ip\"/" yeelight-cube/cube.example.json | as_agent tee "$lamp_dir/cube.json" > /dev/null
-  nc -z -w 3 "$cube_ip" 55443 && echo "The cube is reachable" || echo "Can't reach the cube: check its address and LAN Control"
-  echo "If it's more than one Panel, list its modules in $lamp_dir/cube.json (yeelight-cube/README.md, step 3)"
+  nc -z -w 3 "$cube_ip" 55443 && echo "The cube is reachable" || echo "Can't reach the cube: please check its address and LAN Control"
+  echo "If it's more than one Panel, please list its modules in $lamp_dir/cube.json (yeelight-cube/README.md, step 3)"
 fi
 
 # Run cube.mjs as agent at every boot, restarted if it stops
@@ -106,4 +106,4 @@ with open(path, 'w') as f:
     f.write('\n')
 EOF
 
-echo "Done. Start a new Claude session as agent and send a prompt: the cube spins while Claude works."
+echo "Done. Please start a new Claude session as agent and send a prompt: the cube spins while Claude works."

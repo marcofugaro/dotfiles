@@ -4,7 +4,7 @@
 trap 'exit 130' INT
 
 # Say so whenever sudo stops for the admin password
-export SUDO_PROMPT='Waiting for your admin password, for sudo: '
+export SUDO_PROMPT='Please enter your admin password, for sudo: '
 
 # Safe to run again: it only sets preferences
 

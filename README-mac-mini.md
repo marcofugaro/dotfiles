@@ -324,8 +324,9 @@ Download the dotfiles as a zip (see [README.md](README.md)), unzip them, and in 
 **Script:** `setup-macbook.sh` makes a key just for the mini, with a passphrase, in `~/.ssh/id_ed25519_mini`, adds
 `ssh mini` (as `agent`) and `ssh mini-admin` (as `<you>`) to `~/.ssh/config`, and sends the key to both users on the
 mini once it's reachable. At its end, `setup-mac-mini.sh` waits for the keys while SSH still takes passwords: send the
-MacBook's by running `./setup-macbook.sh` again, and the phone's with Termius's Export to host, which the script
-explains. It also takes keys pasted one per line. To add keys later, run `./setup-mac-mini.sh` again.
+MacBook's by running `./setup-macbook.sh` again, and the phone's with Termius's Export to…, which the script
+explains step by step: Termius gets two hosts, `mini` (as `agent`) and `mini-admin` (as `<you>`), like the MacBook.
+It also takes keys pasted one per line. To add keys later, run `./setup-mac-mini.sh` again.
 
 **Lock SSH to keys and to your tailnet.** Once both users have a key, the script runs `--lock-ssh` for you. Run it
 from a session you keep open until the tests pass, so a mistake can't lock you out.
@@ -463,7 +464,7 @@ tailnet address, where only your devices can reach it. Open a repo's dev server 
 
 - **Tailscale:** the same account as the other devices.
 - **Claude:** the Code tab lists the mini's sessions. Allow notifications.
-- **Termius:** the SSH host from step 6. Turn on Mosh for that host if your connection is flaky.
+- **Termius:** the SSH hosts `mini` and `mini-admin` from step 6. Turn on Mosh for them if your connection is flaky.
 - **Chrome:** for the dev servers' addresses.
 
 **Script:** Mosh's server is let through the mini's firewall.
