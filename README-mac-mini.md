@@ -322,10 +322,10 @@ Download the dotfiles as a zip (see [README.md](README.md)), unzip them, and in 
 ### 6. SSH keys
 
 **Script:** `setup-macbook.sh` makes a key just for the mini, with a passphrase, in `~/.ssh/id_ed25519_mini`, adds
-`ssh mini` (as `agent`) and `ssh mini-admin` (as `<you>`) to `~/.ssh/config`, and copies the public key to the
-clipboard. At its end, `setup-mac-mini.sh` asks for the public keys, one per line, and adds each to both users; it
-explains where to find them, including how to make the phone's key in Termius. To add keys later, run
-`./setup-mac-mini.sh` again.
+`ssh mini` (as `agent`) and `ssh mini-admin` (as `<you>`) to `~/.ssh/config`, and sends the key to both users on the
+mini once it's reachable. At its end, `setup-mac-mini.sh` waits for the keys while SSH still takes passwords: send the
+MacBook's by running `./setup-macbook.sh` again, and the phone's with Termius's Export to host, which the script
+explains. It also takes keys pasted one per line. To add keys later, run `./setup-mac-mini.sh` again.
 
 **Lock SSH to keys and to your tailnet.** Once both users have a key, the script runs `--lock-ssh` for you. Run it
 from a session you keep open until the tests pass, so a mistake can't lock you out.

@@ -6,6 +6,8 @@ trap 'exit 130' INT
 # Say so whenever sudo stops for the admin password
 export SUDO_PROMPT='Waiting for your admin password, for sudo: '
 
+# Safe to run again: it only sets preferences
+
 # Expand save panel by default
 defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode -bool true
 defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2 -bool true

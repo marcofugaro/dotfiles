@@ -6,8 +6,10 @@ trap 'exit 130' INT
 # Say so whenever sudo stops for the admin password
 export SUDO_PROMPT='Waiting for your admin password, for sudo: '
 
-# Generate an SSH key for GitHub, skip it on Macs that shouldn't hold your personal key
-read -p "Waiting for your answer: generate an SSH key for GitHub? [y/N] " ssh_key
+# Setup for every Mac, before its own setup script. Safe to run again: it skips what's done.
+
+# Generate an SSH key for GitHub, unless there's one; skip it on Macs that shouldn't hold your personal key
+[ -e ~/.ssh/id_ed25519 ] || read -p "Waiting for your answer: generate an SSH key for GitHub? [y/N] " ssh_key
 if [[ "$ssh_key" == [yY] ]]; then
   echo "Waiting for you: press Enter to keep the key's default location, then choose a passphrase"
   ssh-keygen -t ed25519
@@ -25,8 +27,10 @@ EOF
 fi
 
 # Install Homebrew
-echo "Waiting for the Homebrew installer: it asks for your admin password, then for Enter to continue"
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+if [ ! -x /opt/homebrew/bin/brew ]; then
+  echo "Waiting for the Homebrew installer: it asks for your admin password, then for Enter to continue"
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 
@@ -40,7 +44,7 @@ brew install python
 brew install node diff-so-fancy tree gh ghostscript bat
 
 # Install npm global commands
-npm install --global fkill-cli
+command -v fkill > /dev/null || npm install --global fkill-cli
 
 # Touch ID for sudo, in tmux too
 brew install pam-reattach
@@ -49,11 +53,11 @@ auth       optional       $(brew --prefix)/lib/pam/pam_reattach.so
 auth       sufficient     pam_tid.so
 EOF
 
-# Install Claude Code
-curl -fsSL https://claude.ai/install.sh | bash
+# Install Claude Code, which then updates itself
+[ -x ~/.local/bin/claude ] || curl -fsSL https://claude.ai/install.sh | bash
 
 # Create the Code folder
-mkdir ~/Code
+mkdir -p ~/Code
 
 # Set macOS defaults
 ./macos.sh
@@ -65,11 +69,9 @@ cp .gitignore ~
 cp .gitconfig ~
 
 # Install zsh plugins
-git clone --depth 1 https://github.com/jirutka/zsh-shift-select.git ~/.zsh/zsh-shift-select
+[ -d ~/.zsh/zsh-shift-select ] || git clone --depth 1 https://github.com/jirutka/zsh-shift-select.git ~/.zsh/zsh-shift-select
 
-# Copy the global Claude Code instructions over
 mkdir -p ~/.claude
-cp CLAUDE.md ~/.claude/CLAUDE.md
 
 # Claude Code settings, merged into what's there: Opus at xhigh effort, the colorblind-friendly dark theme, and
 # background sessions that edit the checkout in place, without a worktree
@@ -88,8 +90,10 @@ with open(path, 'w') as f:
 PY
 
 # Make zsh the default shell
-echo "Waiting for your password, to change the shell"
-chsh -s /bin/zsh
+if [[ "$(dscl . -read "/Users/$(whoami)" UserShell)" != *" /bin/zsh" ]]; then
+  echo "Waiting for your password, to change the shell"
+  chsh -s /bin/zsh
+fi
 
 # Launch zsh
 exec zsh

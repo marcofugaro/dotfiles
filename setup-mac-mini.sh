@@ -14,7 +14,7 @@ while kill -0 "$$" 2> /dev/null; do sudo -n true; sleep 60; done 2> /dev/null &
 # Before running it, in the Tailscale admin console: save the access policy that owns tag:mini, and turn on
 # MagicDNS and HTTPS certificates (README-mac-mini.md, step 5).
 # At the end it turns FileVault off, then asks for Find My, the SSH keys, the Claude and GitHub logins and the repos,
-# explaining each and skipping what's done, so run it again to add keys or repos.
+# explaining each. Safe to run again: it skips what's done, so run it again to add keys or repos.
 #   ./setup-mac-mini.sh --lock-ssh   allows only key logins from the tailnet, done for you once both users have a key
 #   ./setup-mac-mini.sh --update     updates Homebrew packages and refreshes what they leave behind
 # The other manual steps are in README-mac-mini.md.
@@ -349,11 +349,14 @@ EOF
 fi
 
 # SSH keys for both users, then SSH locked to them
-cat <<'EOF'
+cat <<EOF
 
-Waiting for SSH keys, for both your account and agent. Paste one public key per line, then an empty line:
-- MacBook: setup-macbook.sh left it in the clipboard; copy it again with: pbcopy < ~/.ssh/id_ed25519_mini.pub
-- Phone: in Termius, Keychain → + → Generate key, type ed25519, with a passphrase. Open the key and copy its public key.
+Waiting for the SSH keys of the MacBook and the phone, for both your account and agent. Until you press Enter, SSH
+also takes passwords, which is how the keys get here:
+- MacBook: in the dotfiles folder, run ./setup-macbook.sh again, which sends its key
+- Phone: in Termius, Keychain → + → Generate key, type ed25519, with a passphrase. Add the mini as a host at
+  $mini_host, then open the key → Export to host, once as $(whoami) and once as agent.
+Or paste public keys here, one per line. Press Enter on an empty line when they're in: SSH then takes keys only.
 EOF
 while read -r -p "> " key && [ -n "$key" ]; do
   add_key "$key"

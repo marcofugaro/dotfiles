@@ -7,7 +7,7 @@ trap 'exit 130' INT
 export SUDO_PROMPT='Waiting for your admin password, for sudo: '
 
 # Yeelight Cube status lamp for the Mac mini: run from the admin account, after setup-mac-mini.sh.
-# First put the cube on your Wi-Fi with a fixed address (yeelight-cube/README.md, step 1).
+# First put the cube on your Wi-Fi with a fixed address (yeelight-cube/README.md, step 1). Safe to run again.
 #   ./setup-mac-mini-status-lamp.sh --update   re-allows Node through the firewall after brew upgrade moves it
 
 # Run a command as agent, from / since it can't enter the private admin home
@@ -71,11 +71,9 @@ sudo tee /Library/LaunchDaemons/local.claude-cube.plist > /dev/null <<'EOF'
 EOF
 sudo chown root:wheel /Library/LaunchDaemons/local.claude-cube.plist
 sudo chmod 644 /Library/LaunchDaemons/local.claude-cube.plist
-if sudo launchctl print system/local.claude-cube &> /dev/null; then
-  sudo launchctl kickstart -k system/local.claude-cube
-else
-  sudo launchctl bootstrap system /Library/LaunchDaemons/local.claude-cube.plist
-fi
+# Reloaded every run, so a changed plist takes effect
+sudo launchctl bootout system/local.claude-cube 2> /dev/null
+sudo launchctl bootstrap system /Library/LaunchDaemons/local.claude-cube.plist
 
 # Add the lamp's hooks to agent's Claude Code settings, next to any others
 as_agent bash -c 'cd ~ && python3 -I -' <<'EOF'

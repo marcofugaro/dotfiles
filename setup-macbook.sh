@@ -6,7 +6,8 @@ trap 'exit 130' INT
 # Say so whenever sudo stops for the admin password
 export SUDO_PROMPT='Waiting for your admin password, for sudo: '
 
-# MacBook setup: run after setup.sh.
+# MacBook setup: run after setup.sh. Safe to run again: it skips what's done, and run it again when
+# setup-mac-mini.sh asks for SSH keys, to send the MacBook's.
 
 # Install applications
 brew install --cask google-chrome visual-studio-code android-file-transfer blender tabby tailscale-app
@@ -46,8 +47,18 @@ Host mini mini-admin
   AddKeysToAgent yes
   UseKeychain yes
 EOF
-pbcopy < ~/.ssh/id_ed25519_mini.pub
-echo "The mini's public key is in the clipboard: paste it when setup-mac-mini.sh asks for SSH keys"
+
+# Send the key to both users on the mini, while it still takes passwords; ssh-copy-id skips it where it's there
+if nc -z -G 5 mini 22 &> /dev/null; then
+  echo "Sending the mini's SSH key: ssh-copy-id asks for your password on the mini, then agent's"
+  ssh-copy-id -i ~/.ssh/id_ed25519_mini.pub mini-admin && ssh-copy-id -i ~/.ssh/id_ed25519_mini.pub mini
+else
+  echo "The mini isn't reachable yet: once setup-mac-mini.sh asks for SSH keys, run ./setup-macbook.sh again"
+fi
+
+# The global Claude Code instructions; on the mini, setup-mac-mini.sh writes them with its own rules added
+mkdir -p ~/.claude
+cp CLAUDE.md ~/.claude/CLAUDE.md
 
 # Copy the Tabby config over
 mkdir -p ~/Library/Application\ Support/tabby
