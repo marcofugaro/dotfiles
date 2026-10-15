@@ -122,9 +122,13 @@ bindkey '^[[B' down-line-or-beginning-search
 # https://github.com/jirutka/zsh-shift-select
 [ -r ~/.zsh/zsh-shift-select/zsh-shift-select.plugin.zsh ] && source ~/.zsh/zsh-shift-select/zsh-shift-select.plugin.zsh
 
+# over SSH, user@host before the path, like marcofugaro@mini:~/Code
+prompt_host=''
+[[ -n "$SSH_CONNECTION" ]] && prompt_host='%n@%m:'
+
 # set the tab title as the current path
 set_tab_title() {
-	print -Pn '\e]0;%~\a'
+	print -Pn "\e]0;${prompt_host}%~\a"
 }
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd set_tab_title
@@ -152,4 +156,4 @@ prompt_git() {
 }
 setopt PROMPT_SUBST
 # # instead of $ as root
-PROMPT='%~ %{'$'\e[2m''%}$(prompt_git)%{'$'\e[22m''%}%(!.#.$) '
+PROMPT="$prompt_host"'%~ %{'$'\e[2m''%}$(prompt_git)%{'$'\e[22m''%}%(!.#.$) '

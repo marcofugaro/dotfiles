@@ -277,6 +277,10 @@ set -g history-limit 100000
 # Window names stay as given, instead of following the program running in them
 set -g automatic-rename off
 
+# The terminal's tab title: user@host and the window, like agent@mini: fix-login
+set -g set-titles on
+set -g set-titles-string '#{user}@#{host_short}: #W'
+
 # A chat that needs you rings the bell: its tab turns red with a !, with a message instead of a sound
 set -g visual-bell on
 
@@ -305,8 +309,10 @@ set -g status-format[0] "$BLANK"
 set -g status-format[1] "#[align=left] #[list=on]#[list=left-marker]<#[list=right-marker]>#[list=on]#{W:$TAB#{T:window-status-format}$END,$CURRENT#{T:window-status-current-format}$END}#[nolist align=right]#{T:status-right}"
 set -g status-format[2] "$BLANK"
 
-# Ctrl-b C: a new Claude chat in a window of its own, asking for a folder in ~/Code and a name
-bind-key -N "New Claude chat in its own window" C command-prompt -p "repo in ~/Code:,chat name:" {
+# The keys used most are Ctrl and a letter, without Ctrl-b, so the programs in the windows never get them
+
+# Ctrl-n: a new Claude chat in a window of its own, asking for a folder in ~/Code and a name
+bind-key -N "New Claude chat in its own window" -n C-n command-prompt -p "repo in ~/Code:,chat name:" {
   if-shell "test -n '%2' && test -d ~/Code/'%1'" {
     new-window -S -n "%2" -c "~/Code/%1" "~/.local/bin/claude -n '%2'"
   } {
@@ -314,12 +320,18 @@ bind-key -N "New Claude chat in its own window" C command-prompt -p "repo in ~/C
   }
 }
 
-# Ctrl-b a: the next window with a !
-bind-key -N "Next window with an alert" a next-window -a
+# Ctrl-t: a new shell, like Ctrl-b c
+bind-key -N "New shell" -n C-t new-window
 
-# Ctrl-b w and Ctrl-b Tab: the window list, picking within this device's view
+# Ctrl-w and Ctrl-b w: the window list, picking within this device's view
+bind-key -N "Choose a window" -n C-w choose-tree -Zw "select-window -t '%%'"
 bind-key -N "Choose a window" w choose-tree -Zw "select-window -t '%%'"
-bind-key -N "Choose a window" Tab choose-tree -Zw "select-window -t '%%'"
+
+# Ctrl-a: the next window with a !
+bind-key -N "Next window with an alert" -n C-a next-window -a
+
+# Ctrl-f: fit the window to this device, like Ctrl-b r
+bind-key -N "Fit the window to this device" -n C-f refresh-client
 EOF
 
 # A running tmux reads its config only when it starts

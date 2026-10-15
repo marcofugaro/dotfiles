@@ -118,7 +118,7 @@ M4 base model rose from €729 at launch to €979.
 - **Full control:** SSH over Tailscale. Use Termius on the phone, and Tabby or VS Code Remote-SSH on the MacBook.
   VS Code opens the repo on the mini as if it were local; its terminal, git and the Claude Code extension all run on
   the mini.
-- **Starting work:** a new chat for each task with `Ctrl-b C`, or ask the main chat; say "use a workflow" for a big
+- **Starting work:** a new chat for each task with `Ctrl-n`, or ask the main chat; say "use a workflow" for a big
   one. Chats edit the repos' own files, so the dev servers show their changes; your rules have parallel tasks on one
   repo use a worktree, which its dev server doesn't serve.
 - **Testing:** agents run GPU tests on the mini's GPU through each repo's `scripts/gpu-lock.js`, so runs never
@@ -437,14 +437,14 @@ chats keep running when you disconnect. Background chats, further down, and chat
 - Lines in `~/.zshrc` that open a view of `main`, on the main chat, at every SSH login, like levelsio. VS Code's
   terminals skip it: type `chats` there. A view goes away when its device leaves; the windows stay.
 - `~/.tmux.conf`: the mouse on, a long scrollback, window names that stay as given, a red tab with a `!` instead of
-  a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, and the keys below. Re-running the
-  script reloads it.
+  a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, `agent@mini: <window>` as the
+  terminal's tab title, and the keys below. Re-running the script reloads it.
 - `~/.zshenv`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It also makes a Mosh server
   quit a day after its device went away, which closes that view.
 
 Check the boot job once with a power cut: switch the smart plug off and on, or run `sudo reboot`.
 1. About a minute later the main chat should appear in the Claude app, and `ssh mini` should land in it.
-2. In a shell window (`Ctrl-b c`), run a repo's GPU tests. A tmux started by launchd at boot runs outside any login,
+2. In a shell window (`Ctrl-t`), run a repo's GPU tests. A tmux started by launchd at boot runs outside any login,
    and I couldn't confirm that macOS gives such processes the GPU. If the tests find no GPU, remove the job as `<you>`
    with `sudo launchctl bootout system/local.mini-up`, again after each run of `setup-mac-mini.sh`, which reinstalls
    it. Then, as `agent`, stop it with `tmux kill-server`, which ends every chat and dev server, and after each restart
@@ -467,21 +467,21 @@ trust `~/Code`: answer them.
 
 **Get around**
 
-tmux keys are `Ctrl-b`, then a key. On the phone: tap **Ctrl** in Termius's key row, then `b`, then the key; check
-once that Ctrl lets go after the `b`, or tap it again. Case matters: `Ctrl-b C` (Shift+c) opens a chat, `Ctrl-b c` a
-shell. The bar at the bottom has a tab for each window: the one you're on is white, one that needs you is red with a
-`!`, and tapping a tab opens its window. On the phone, `<` or `>` at its edges means more windows, and the right end
-shows a `!` for each one that needs you.
+The keys you need most are Ctrl and a letter; the rest are `Ctrl-b`, then a key. On the phone: tap **Ctrl** in
+Termius's key row, then the letter; for `Ctrl-b`, check once that Ctrl lets go after the `b`, or tap it again. The bar
+at the bottom has a tab for each window: the one you're on is white, one that needs you is red with a `!`, and
+tapping a tab opens its window. On the phone, `<` or `>` at its edges means more windows, and the right end shows a
+`!` for each one that needs you.
 
 | Keys | |
 |---|---|
-| `Ctrl-b w` or `Ctrl-b Tab` | Every window, with a preview and its `!`: pick one with the arrows and Enter |
-| `Ctrl-b a` | The next window marked `!` |
+| `Ctrl-w` | Every window, with a preview and its `!`: pick one with the arrows and Enter |
+| `Ctrl-a` | The next window marked `!` |
+| `Ctrl-n` | A new chat |
+| `Ctrl-t` | A new shell, in `~/Code` |
+| `Ctrl-f` | Fit the window to this device again |
 | `Ctrl-b n` / `Ctrl-b p` | The next / previous window |
-| `Ctrl-b C` | A new chat |
-| `Ctrl-b c` | A new shell, in `~/Code` |
 | `Ctrl-b ,` | Rename this window |
-| `Ctrl-b r` | Fit the window to this device again |
 | `Ctrl-b [` | Scroll back in a shell or a dev server's window; `q` stops |
 | `Ctrl-b d` | Leave tmux for a shell on the mini: `exit` disconnects, `chats` goes back |
 
@@ -496,25 +496,25 @@ starts a new main chat within 5 minutes.
 
 **Start a new chat**
 
-`Ctrl-b C`, then the repo's folder in `~/Code` and Enter (Enter alone for all of `~/Code`), then a name and Enter. A
+`Ctrl-n`, then the repo's folder in `~/Code` and Enter (Enter alone for all of `~/Code`), then a name and Enter. A
 new window opens with Claude in that folder, ready for your first prompt, and the other device sees it in its list.
 - Name it after the task, like `fix-login`, not after the repo: a taken name, like a dev server's window or `claude`,
   opens that window instead. A folder that isn't in `~/Code`, or no name, opens nothing.
 - The first chat in a folder may ask whether to trust it: answer yes.
 - A chat edits the repo's own files, so its dev server shows the changes. For parallel tasks on one repo, your rules
   have Claude use a worktree, which the dev server doesn't serve.
-- `/exit` ends a chat and closes its window; its conversation stays. To continue it, `Ctrl-b C` with the same folder
+- `/exit` ends a chat and closes its window; its conversation stays. To continue it, `Ctrl-n` with the same folder
   and a name, then `/resume` and pick it.
 
 **Check on a chat from the other device**
 
-Connect, `Ctrl-b w`, and pick the chat: it's live, and you can answer it or give it the next task. A chat rings when a
+Connect, `Ctrl-w`, and pick the chat: it's live, and you can answer it or give it the next task. A chat rings when a
 permission prompt has waited about six seconds, and about a minute after it finishes, if nobody has typed in it since
 and none of its background agents is still running. Its window then shows `!` on every device until one of them
-opens it, and `Ctrl-b a` jumps there.
+opens it, and `Ctrl-a` jumps there.
 - Both devices can show the same chat. They then share its screen and scrolling, so use one at a time.
 - A window takes the size of the device that last pressed a key in it. The other device sees it cut off, or small with
-  dots around it, until it presses a key there: `Ctrl-b r` does that without typing into the chat.
+  dots around it, until it presses a key there: `Ctrl-f` does that without typing into the chat.
 
 **Long tasks and ultracode**
 
@@ -529,7 +529,7 @@ in its chat, open that chat:
 
 **Background chats**
 
-For a task you don't need to watch, start a chat without a window, from a shell in the repo (`Ctrl-b c`, `cd <repo>`):
+For a task you don't need to watch, start a chat without a window, from a shell in the repo (`Ctrl-t`, `cd <repo>`):
 ```sh
 claude --bg -n <name> "<prompt>"
 ```
@@ -553,6 +553,9 @@ tmux new-window -t main: -n <repo> -c ~/Code/<repo> "npm run dev"
 **Claude's keys in tmux**
 - A new line in a prompt: Ctrl+J.
 - Claude's Ctrl+B, which sends a running command to the background: press Ctrl-b twice, since tmux takes the first.
+- tmux takes Ctrl+N, Ctrl+T, Ctrl+W, Ctrl+A and Ctrl+F, so Claude and the shell never get them. ↓ does what Ctrl+N
+  did; in Tabby, ⌥⌫ deletes a word and ⌘← goes to the start of a line. Claude's task list (Ctrl+T) and Find in
+  `claude agents` (Ctrl+F) are out of reach.
 - A garbled screen: Ctrl+L redraws it.
 
 ### 11. Seeing results
@@ -634,9 +637,9 @@ through reboots with nobody logged in, and Claude can change the colors and anim
 - [ ] SSH keys from the MacBook and the phone; `--lock-ssh` run and password logins refused
 - [ ] `agent` logged in to GitHub; repos cloned, each with its own port; GPU tests pass over SSH
 - [ ] Claude Code logged in as `agent` with claude.ai; memory copied
-- [ ] The main chat comes back after a restart, and GPU tests pass in a shell window (`Ctrl-b c`) there
+- [ ] The main chat comes back after a restart, and GPU tests pass in a shell window (`Ctrl-t`) there
 - [ ] `ssh mini` and Termius `mini` both land in the main chat; each device switches chats on its own; a chat opened
-  with `Ctrl-b C` on one shows up on the other, with a `!` while it waits on a permission prompt
+  with `Ctrl-n` on one shows up on the other, with a `!` while it waits on a permission prompt
 - [ ] VS Code Remote-SSH works; the dev servers open at `https://mini.<tailnet>.ts.net:<port>` on the phone
 - [ ] Tried everything from outside the home network: SSH, VS Code, the Claude app
 - [ ] Security key on the claude.ai sign-in account; trusted devices on
