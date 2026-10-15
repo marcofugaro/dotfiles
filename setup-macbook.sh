@@ -3,11 +3,18 @@
 # Stop the whole script on Ctrl+C, even when the interrupted command catches it
 trap 'exit 130' INT
 
+# Colors and headings for the output
+source "$(dirname "$0")/utils/print.sh"
+
 # Say so whenever sudo stops for the admin password
-export SUDO_PROMPT='Please enter your admin password, for sudo: '
+export SUDO_PROMPT="${bold}${yellow}Please enter your admin password, for sudo:${reset} "
 
 # MacBook setup: run after setup.sh. Safe to run again: it skips what's done, and run it again when
 # setup-mac-mini.sh asks for SSH keys, to send the MacBook's.
+title "MacBook setup"
+
+
+section "Apps"
 
 # Install an application, unless it's in /Applications already, from Homebrew or not
 install_app() {
@@ -33,12 +40,41 @@ killall Dock
 # Open VS Code projects on the Mac mini over SSH, with the app's own CLI since `code` may not be on the path
 "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension ms-vscode-remote.remote-ssh
 
+
+section "Tailscale"
+
+# Signed in to Tailscale, by the app's own CLI. Signing in has no command, so open the app and carry on once it's in
+tailscale_on() {
+  /Applications/Tailscale.app/Contents/MacOS/Tailscale status &> /dev/null
+}
+if ! tailscale_on; then
+  open -a Tailscale
+  ask "Please sign in to Tailscale, in the app that just opened:"
+  cat <<'EOF'
+1. Allow what macOS asks for it, like the VPN configuration
+2. Log in with the tailnet's account, with two-factor login turned on for it
+The script carries on once you're in. To skip it, please press Enter.
+EOF
+  until tailscale_on || read -r -t 5; do :; done
+  if tailscale_on; then
+    ok "Signed in to Tailscale"
+  else
+    warn "Tailscale skipped: please run this script again to sign in"
+  fi
+fi
+
+
+section "SSH to the mini"
+
 # A key just for the mini, and `ssh mini` (agent) and `ssh mini-admin` (your account, same name as here) over MagicDNS
 if [ ! -e ~/.ssh/id_ed25519_mini ]; then
-  echo "Please choose a passphrase for the mini's SSH key"
+  ask "Please choose a passphrase for the mini's SSH key"
   ssh-keygen -t ed25519 -C "macbook → mini" -f ~/.ssh/id_ed25519_mini
-  echo "Please enter that passphrase again, to remember it in the keychain"
-  ssh-add --apple-use-keychain ~/.ssh/id_ed25519_mini
+fi
+# Its passphrase in the keychain, unless the agent has the key already. Apple's ssh-add, since Homebrew's has no keychain
+if ! ssh-add -l 2> /dev/null | grep -qF "$(ssh-keygen -lf ~/.ssh/id_ed25519_mini.pub | cut -d ' ' -f 2)"; then
+  ask "Please enter the key's passphrase again if asked, to remember it in the keychain"
+  /usr/bin/ssh-add --apple-use-keychain ~/.ssh/id_ed25519_mini
 fi
 grep -q '^Host mini$' ~/.ssh/config 2> /dev/null || cat >> ~/.ssh/config <<EOF
 
@@ -58,11 +94,14 @@ EOF
 
 # Send the key to both users on the mini, while it still takes passwords; ssh-copy-id skips it where it's there
 if nc -z -G 5 mini 22 &> /dev/null; then
-  echo "Sending the mini's SSH key: please enter your password on the mini when ssh-copy-id asks, then agent's"
+  ask "Sending the mini's SSH key: please enter your password on the mini when ssh-copy-id asks, then agent's"
   ssh-copy-id -i ~/.ssh/id_ed25519_mini.pub mini-admin && ssh-copy-id -i ~/.ssh/id_ed25519_mini.pub mini
 else
-  echo "The mini isn't reachable yet: please run ./setup-macbook.sh again once setup-mac-mini.sh asks for SSH keys"
+  warn "The mini isn't reachable yet: please run ./setup-macbook.sh again once setup-mac-mini.sh asks for SSH keys"
 fi
+
+
+section "Settings"
 
 # The global Claude Code instructions; on the mini, setup-mac-mini.sh writes them with its own rules added
 mkdir -p ~/.claude
@@ -76,5 +115,7 @@ cp tabby-config.yaml ~/Library/Application\ Support/tabby/config.yaml
 cp ProFontWindows.ttf ~/Library/Fonts
 
 # Sleep the display and the Mac after 90 minutes on power
-sudo pmset -c displaysleep 90
-sudo pmset -c sleep 90
+sudo pmset -c displaysleep 90 sleep 90
+
+echo
+ok "Done"

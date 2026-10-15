@@ -229,8 +229,8 @@ Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (ste
 
 1. Commit and push your work. The mini gets your repos from GitHub; the gitignored `*.local` scratch folders and
    `.claude/worktrees` stay behind.
-2. Install Tailscale on the MacBook (`setup-macbook.sh` installs the app) and sign in. Turn on two-factor login for the
-   account you sign in with.
+2. Install Tailscale on the MacBook and sign in: `setup-macbook.sh` installs the app, opens it and waits for you to sign
+   in. Turn on two-factor login for the account you sign in with.
 
 ### 1. First boot
 

@@ -3,12 +3,11 @@
 # Stop the whole script on Ctrl+C, even when the interrupted command catches it
 trap 'exit 130' INT
 
-# Say so whenever sudo stops for the admin password
-export SUDO_PROMPT='Please enter your admin password, for sudo: '
+# Colors and headings for the output
+source "$(dirname "$0")/utils/print.sh"
 
-# Ask for it once, and keep sudo from asking again while the script waits for you
-sudo -v
-while kill -0 "$$" 2> /dev/null; do sudo -n true; sleep 60; done 2> /dev/null &
+# Say so whenever sudo stops for the admin password
+export SUDO_PROMPT="${bold}${yellow}Please enter your admin password, for sudo:${reset} "
 
 # Mac mini setup: run at the mini itself, from the admin account, after setup.sh.
 # Before running it, in the Tailscale admin console: save the access policy that owns tag:mini, and turn on
@@ -18,6 +17,11 @@ while kill -0 "$$" 2> /dev/null; do sudo -n true; sleep 60; done 2> /dev/null &
 #   ./setup-mac-mini.sh --lock-ssh   allows only key logins from the tailnet, done for you once both users have a key
 #   ./setup-mac-mini.sh --update     updates Homebrew packages and refreshes what they leave behind
 # The other manual steps are in README-mac-mini.md.
+title "Mac mini setup"
+
+# Ask for it once, and keep sudo from asking again while the script waits for you
+sudo -v
+while kill -0 "$$" 2> /dev/null; do sudo -n true; sleep 60; done 2> /dev/null &
 
 # Let Mosh through the firewall, by the path of its current version
 allow_mosh() {
@@ -36,7 +40,7 @@ PermitRootLogin no
 AuthenticationMethods publickey
 AllowUsers agent@100.64.0.0/10 agent@fd7a:115c:a1e0::/48 $(whoami)@100.64.0.0/10 $(whoami)@fd7a:115c:a1e0::/48
 EOF
-  sudo sshd -t && echo "SSH locked to keys and the tailnet: please test it from a new connection before closing this one"
+  sudo sshd -t && ok "SSH locked to keys and the tailnet: please test it from a new connection before closing this one"
 }
 
 if [[ "$1" == "--lock-ssh" ]]; then
@@ -55,7 +59,9 @@ install_tailscaled() {
 # Update, then re-allow Mosh and reinstall the Tailscale daemon, which brew upgrade leaves on the old version
 # Restarting Tailscale can drop SSH sessions over it for a moment, so run it in tmux
 if [[ "$1" == "--update" ]]; then
+  section "Homebrew update"
   brew update && brew upgrade
+  section "Mosh and Tailscale"
   allow_mosh
   install_tailscaled
   [ -e /Library/LaunchDaemons/local.claude-cube.plist ] && ./setup-mac-mini-status-lamp.sh --update
@@ -72,21 +78,22 @@ tailnet_host() {
   tailscale status --json 2> /dev/null | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2> /dev/null || echo 'mini.<tailnet>.ts.net'
 }
 
-# Show what to do by hand, then wait for Enter
+# Show what to do by hand, then the details, then wait for Enter
 wait_for() {
   echo
-  echo "$1"
-  read -r -p "Please press Enter when done. "
+  ask "$1"
+  echo "$2"
+  prompt REPLY "Please press Enter when done."
 }
 
 # Add a public key to both users' authorized_keys, once
 add_key() {
-  ssh-keygen -l -f /dev/stdin <<< "$1" &> /dev/null || { echo "That's not a public key, skipped"; return; }
+  ssh-keygen -l -f /dev/stdin <<< "$1" &> /dev/null || { warn "That's not a public key, skipped"; return; }
   for user in "$(whoami)" agent; do
     (cd / && sudo -H -u "$user" bash -c 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys &&
       chmod 600 ~/.ssh/authorized_keys && { grep -qxF "$1" ~/.ssh/authorized_keys || echo "$1" >> ~/.ssh/authorized_keys; }' _ "$1")
   done
-  echo "Added for $(whoami) and agent"
+  ok "Added for $(whoami) and agent"
 }
 
 # Clone a repo for agent into ~/Code and install it
@@ -111,6 +118,9 @@ brew_install() {
 install_app() {
   [ -e "/Applications/$2.app" ] || brew install --cask "$1"
 }
+
+
+section "System settings"
 
 # Name the machine
 sudo scutil --set ComputerName mini
@@ -140,6 +150,9 @@ defaults write com.apple.dock persistent-apps -array \
   "$(dock_item /System/Applications/System\ Settings.app)"
 killall Dock
 
+
+section "Packages and apps"
+
 # Install tmux, Mosh and the Tailscale daemon
 brew_install tmux mosh tailscale
 
@@ -148,14 +161,18 @@ install_app blender Blender
 
 allow_mosh
 
+
+section "Tailscale"
+
 # Start Tailscale at boot, then approve the device from the link it prints, unless it's connected already
 install_tailscaled
 if ! tailscale status &> /dev/null; then
-  echo "Please approve the mini: open the link Tailscale prints, signed in as the tailnet's owner"
+  ask "Please approve the mini: open the link Tailscale prints, signed in as the tailnet's owner"
   if ! sudo tailscale up --hostname=mini --advertise-tags=tag:mini; then
+    echo
+    fail "Tailscale refused the login."
     cat <<'EOF'
-
-Tailscale refused the login. If it says tag:mini is invalid or not permitted, please save the access policy with
+If it says tag:mini is invalid or not permitted, please save the access policy with
 "tagOwners": { "tag:mini": ["autogroup:owner", "autogroup:admin"] } in the admin console (README-mac-mini.md,
 step 5), approve the link signed in as the tailnet's owner or an admin, then run this script again.
 EOF
@@ -168,6 +185,9 @@ for port in {5173..5180}; do
   sudo tailscale serve --bg --https="$port" "$port"
 done
 
+
+section "Claude Code instructions"
+
 # This machine's rules for Claude Code, with its tailnet address
 mini_host="$(tailnet_host)"
 claude_md="$(cat CLAUDE.md; echo; sed "s/mini\.<tailnet>\.ts\.net/$mini_host/" CLAUDE-mac-mini.md)"
@@ -178,9 +198,11 @@ printf "%s\n" "$claude_md" > ~/.claude/CLAUDE.md
 # The agent user, a standard user that runs Claude                            #
 ###############################################################################
 
+section "The agent user"
+
 # Create it, asking for its password
 if ! id agent &> /dev/null; then
-  echo "Please choose a password for the new agent user"
+  ask "Please choose a password for the new agent user"
   sudo sysadminctl -addUser agent -fullName agent -password -
 fi
 sudo createhomedir -c -u agent > /dev/null
@@ -271,6 +293,8 @@ printf "%s\n" "$claude_md" | as_agent tee /Users/agent/.claude/CLAUDE.md > /dev/
 # Machine-wide                                                                #
 ###############################################################################
 
+section "Claude Code rules and the boot job"
+
 # Claude Code rules agent can't loosen
 sudo mkdir -p "/Library/Application Support/ClaudeCode"
 sudo tee "/Library/Application Support/ClaudeCode/managed-settings.json" > /dev/null <<'EOF'
@@ -334,12 +358,16 @@ sudo launchctl bootstrap system /Library/LaunchDaemons/local.mini-up.plist
 # Keys and logins, which only you can provide                                 #
 ###############################################################################
 
+section "FileVault"
+
 # FileVault off, so the mini comes back by itself after a power cut instead of waiting at the unlock screen
 if fdesetup isactive &> /dev/null; then
-  echo
-  echo "Turning FileVault off. Please enter your user name and password:"
+  ask "Turning FileVault off. Please enter your user name and password:"
   sudo fdesetup disable
 fi
+
+
+section "Find My"
 
 # Find My, to locate, lock or erase a stolen mini. The Apple Account sign-in has no command, so open its settings
 # and carry on once Find My is on; macos.sh turns on Location Services
@@ -348,30 +376,31 @@ find_my_on() {
 }
 if ! find_my_on; then
   open "x-apple.systempreferences:com.apple.systempreferences.AppleIDSettings"
+  ask "Please turn on Find My, in the System Settings window that just opened:"
   cat <<'EOF'
-
-Please turn on Find My, in the System Settings window that just opened:
 1. Sign in with your Apple Account, then turn off what iCloud syncs: the mini only needs Find My
 2. iCloud → Find My Mac: turn it on, and allow it the mini's location if it asks
 The script carries on once Find My Mac is on. To skip it, please press Enter.
 EOF
   until find_my_on || read -r -t 5; do :; done
   if find_my_on; then
-    echo "Find My is on: please check from your phone at icloud.com/find that the mini is on the map"
+    ok "Find My is on: please check from your phone at icloud.com/find that the mini is on the map"
   else
-    echo "Find My skipped: please run this script again to turn it on"
+    warn "Find My skipped: please run this script again to turn it on"
   fi
 fi
 
+
+section "SSH keys"
+
 # SSH keys for both users, then SSH locked to them
+ask "Please add the SSH keys of the MacBook and the phone, for both your account and agent."
 cat <<EOF
+Until you press Enter, SSH also takes passwords, which is how the keys get here.
 
-Please add the SSH keys of the MacBook and the phone, for both your account and agent. Until you press Enter, SSH
-also takes passwords, which is how the keys get here.
+${bold}MacBook${reset}: in the dotfiles folder, run ./setup-macbook.sh again, which sends its key.
 
-MacBook: in the dotfiles folder, run ./setup-macbook.sh again, which sends its key.
-
-Phone, in Termius, with Tailscale on:
+${bold}Phone${reset}, in Termius, with Tailscale on:
 1. Keychain → + → New SSH Key → Generate new SSH Key: name it "phone → mini", key type ED25519, with a passphrase
 2. Hosts → + → New Host: label mini, address $mini_host, username agent. Save it.
 3. One more host: label mini-admin, the same address, username $(whoami). Save it.
@@ -379,10 +408,10 @@ Phone, in Termius, with Tailscale on:
    agent's password.
 5. Export the key again, to mini-admin. If it asks, use $(whoami) and your password on the mini.
 Exporting also attaches the key to the host, so mini and mini-admin log in with it from then on.
-
-Or paste public keys here, one per line. Press Enter on an empty line when they're in: SSH then takes keys only.
 EOF
-while read -r -p "> " key && [ -n "$key" ]; do
+echo
+ask "Or paste public keys here, one per line. Press Enter on an empty line when they're in: SSH then takes keys only."
+while prompt key ">" && [ -n "$key" ]; do
   add_key "$key"
 done
 
@@ -390,35 +419,38 @@ done
 if [ ! -e /etc/ssh/sshd_config.d/000-hardening.conf ]; then
   if [ -s ~/.ssh/authorized_keys ] && sudo test -s /Users/agent/.ssh/authorized_keys; then
     lock_ssh
-    wait_for "Please test SSH, now limited to keys and the tailnet:
-- MacBook: ssh mini 'echo key login works', then ssh -o PubkeyAuthentication=no mini, which must fail with \"Permission denied\"
+    wait_for "Please test SSH, now limited to keys and the tailnet:" \
+"- MacBook: ssh mini 'echo key login works', then ssh -o PubkeyAuthentication=no mini, which must fail with \"Permission denied\"
 - Phone: in Termius, connect to mini and to mini-admin, which must log in with the key and not ask for a password
 If a test fails, run sudo rm /etc/ssh/sshd_config.d/000-hardening.conf to allow passwords again, and check the keys."
   else
-    echo "SSH stays open to passwords until both users have a key: please run this script again to add them"
+    warn "SSH stays open to passwords until both users have a key: please run this script again to add them"
   fi
 fi
 
-# Claude login for agent
+
+section "Claude login for agent"
+
 if ! as_agent zsh -lc '~/.local/bin/claude auth status' &> /dev/null; then
-  echo
-  echo "Please log agent in to Claude: open the link it prints, approve with your claude.ai account, and paste the code back here."
+  ask "Please log agent in to Claude: open the link it prints, approve with your claude.ai account, and paste the code back here."
   as_agent zsh -lc 'cd ~ && ~/.local/bin/claude auth login'
   # The boot job may have started Claude before the login, restart it logged in
   as_agent zsh -lc 'tmux respawn-window -k -t main:claude' 2> /dev/null
 fi
 
-# GitHub login for agent, with a token of its own
-if ! as_agent zsh -lc 'gh auth status' &> /dev/null; then
-  cat <<'EOF'
 
-Please make a GitHub token just for agent:
+section "GitHub login for agent"
+
+# With a token of its own
+if ! as_agent zsh -lc 'gh auth status' &> /dev/null; then
+  ask "Please make a GitHub token just for agent:"
+  cat <<'EOF'
 1. On github.com: Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token
 2. Expiration: 90 days. Repository access: only the repos the mini works on.
 3. Permissions → Repository permissions: Contents read and write, Pull requests read and write
 4. Generate it and copy the token
 EOF
-  read -r -s -p "Please paste the token (hidden): " token
+  prompt token "Please paste the token (hidden):" -s
   echo
   printf '%s\n' "$token" | as_agent zsh -lc 'gh auth login --with-token'
   unset token
@@ -426,19 +458,20 @@ fi
 # Git over HTTPS with that login, set again each run since the dotfiles above replace ~/.gitconfig
 as_agent zsh -lc 'gh auth status &> /dev/null && gh auth setup-git'
 
+
+section "Repos"
+
 # The repos, each with its dev server running
-echo
-read -r -p "Please list the repos to clone into agent's ~/Code, space-separated (name or owner/name), or press Enter to skip: " repos
+prompt repos "Please list the repos to clone into agent's ~/Code, space-separated (name or owner/name), or press Enter to skip:"
 for repo in $repos; do
   add_repo "$repo"
 done
 if [ -n "$repos" ]; then
   as_agent zsh -l /Users/agent/mini-up.sh
-  echo "Their dev servers are running, each in the tmux window named after its repo"
+  ok "Their dev servers are running, each in the tmux window named after its repo"
 fi
 
-cat <<'EOF'
-
-Done. Please finish with README-mac-mini.md: pin each repo's dev server port in its Vite config (step 8), bring your
-Claude memory over from the MacBook (step 9), and check the boot job with a power cut (step 10).
-EOF
+echo
+ok "Done"
+ask "Please finish with README-mac-mini.md: pin each repo's dev server port in its Vite config (step 8), bring your
+Claude memory over from the MacBook (step 9), and check the boot job with a power cut (step 10)."
