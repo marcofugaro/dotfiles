@@ -134,7 +134,7 @@ autoload -Uz add-zsh-hook
 add-zsh-hook precmd set_tab_title
 
 # prompt inspired by Pure https://github.com/sindresorhus/pure
-# the path, then the git branch dimmed, with * for uncommitted changes
+# over SSH user@host dimmed, then the path, then the git branch dimmed, with * for uncommitted changes
 prompt_git() {
 	git rev-parse --is-inside-work-tree &>/dev/null || return
 
@@ -155,5 +155,7 @@ prompt_git() {
 	echo "${branchName}${dirty} "
 }
 setopt PROMPT_SUBST
+prompt_dim=%{$'\e[2m'%}
+prompt_undim=%{$'\e[22m'%}
 # # instead of $ as root
-PROMPT="$prompt_host"'%~ %{'$'\e[2m''%}$(prompt_git)%{'$'\e[22m''%}%(!.#.$) '
+PROMPT='${prompt_host:+$prompt_dim$prompt_host$prompt_undim}%~ $prompt_dim$(prompt_git)$prompt_undim%(!.#.$) '
