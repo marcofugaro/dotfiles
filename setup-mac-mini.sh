@@ -12,8 +12,9 @@ export SUDO_PROMPT="${bold}${yellow}Please enter your admin password, for sudo:$
 # Mac mini setup: run at the mini itself, from the admin account, after setup.sh.
 # Before running it, in the Tailscale admin console: save the access policy that owns tag:mini, and turn on
 # MagicDNS and HTTPS certificates (README-mac-mini.md, step 5).
-# At the end it turns FileVault off, then asks for Find My, the SSH keys, the Claude and GitHub logins and the repos,
-# explaining each. Safe to run again: it skips what's done, so run it again to add keys or repos.
+# At the end it turns FileVault off, then asks for Find My, the phone on Tailscale, the SSH keys, the Claude and
+# GitHub logins and the repos, explaining each. Safe to run again: it skips what's done, so run it again to add keys
+# or repos.
 #   ./setup-mac-mini.sh --lock-ssh   allows only key logins from the tailnet, done for you once both users have a key
 #   ./setup-mac-mini.sh --update     updates Homebrew packages and refreshes what they leave behind
 # The other manual steps are in README-mac-mini.md.
@@ -76,6 +77,14 @@ as_agent() {
 # The mini's MagicDNS name, like mini.<tailnet>.ts.net
 tailnet_host() {
   tailscale status --json 2> /dev/null | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2> /dev/null || echo 'mini.<tailnet>.ts.net'
+}
+
+# Whether a phone is on the tailnet, which Termius needs to reach the mini
+phone_on_tailnet() {
+  tailscale status --json 2> /dev/null | python3 -c '
+import json, sys
+peers = (json.load(sys.stdin).get("Peer") or {}).values()
+sys.exit(not any(p.get("OS") in ("android", "iOS") for p in peers))' 2> /dev/null
 }
 
 # Show what to do by hand, then the details, then wait for Enter
@@ -202,7 +211,7 @@ section "The agent user"
 
 # Create it, asking for its password
 if ! id agent &> /dev/null; then
-  ask "Please choose a password for the new agent user"
+  ask "Please choose a password for the new agent user: you'll need it again for the MacBook's and the phone's SSH keys"
   sudo sysadminctl -addUser agent -fullName agent -password -
 fi
 sudo createhomedir -c -u agent > /dev/null
@@ -229,25 +238,98 @@ eval "\$(/opt/homebrew/bin/brew shellenv)"
 export __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS='$mini_host'
 EOF
 
-# Land in the tmux session on every SSH login
+# For every other shell too, like the one SSH runs a command in, which is how Mosh starts its server
+as_agent tee /Users/agent/.zshenv > /dev/null <<'EOF'
+typeset -U PATH path
+path=(/opt/homebrew/bin $path)
+
+# a Mosh server whose device went away quits after a day, which closes its tmux view
+export MOSH_SERVER_NETWORK_TMOUT=86400
+EOF
+
+# On every SSH login, a view of the tmux session of its own: devices share the windows, each picks its own
 as_agent tee -a /Users/agent/.zshrc > /dev/null <<'EOF'
 
-# attach to the main tmux session on SSH logins, except from VS Code
+# open a view of the main tmux session's windows, for this terminal only, on the main chat; it goes away when it
+# detaches
+chats() {
+  if ! tmux has-session -t '=main' 2> /dev/null; then
+    if tmux list-sessions -F '#{session_group}' 2> /dev/null | grep -qxF main; then
+      # main was closed while a view kept its windows: it takes them back
+      tmux new-session -d -s main -t main -c ~/Code 2> /dev/null
+    else
+      tmux new-session -d -s main -n claude -c ~/Code "$HOME/.local/bin/claude -n main"
+    fi
+  fi
+  tmux new-session -t '=main' -c ~/Code \; set-option destroy-unattached keep-last \; select-window -t '=claude'
+}
+
+# on SSH logins, except from VS Code, whose terminals run `chats` by hand
 if [[ -n "$SSH_CONNECTION" && -z "$TMUX" && "$TERM_PROGRAM" != "vscode" && $- == *i* ]]; then
-  tmux new-session -A -s main
+  chats
 fi
 EOF
 
 as_agent tee /Users/agent/.tmux.conf > /dev/null <<'EOF'
 set -g mouse on
 set -g history-limit 100000
+
+# Window names stay as given, instead of following the program running in them
+set -g automatic-rename off
+
+# A chat that needs you rings the bell: its tab turns red with a !, with a message instead of a sound
+set -g visual-bell on
+
+# The status line is a row of tabs, in fixed colors that read in any terminal theme: the current tab white, one that
+# needs you red. Spacing is on a 4px scale, as near as cells allow: 2 cells (16px) each side of the name, 1 cell (8px)
+# between tabs and at the edges, and a blank row (16px) above and below
+set -g status 3
+set -g message-line 1
+set -g status-style 'bg=default,fg=colour250'
+set -g window-status-style 'bg=colour238,fg=colour252'
+set -g window-status-current-style 'bg=colour255,fg=colour16,bold'
+set -g window-status-bell-style 'bg=colour203,fg=colour16,bold'
+set -g window-status-format '  #W#{?window_bell_flag,!,}  '
+set -g window-status-current-format '  #W  '
+
+# On the right the clock, or on a narrow screen a ! for each window that needs you
+set -g status-right '#{?#{e|<:#{client_width},80},#{W:#{?window_bell_flag,!,}},%H:%M} '
+
+# The names in the middle row. The blank rows above and below carry the tabs' ranges at the same widths, so a tap
+# there opens the tab it touches, three rows tall to hit on the phone
+%hidden TAB='#[range=window|#{window_index} #{?window_bell_flag,#{E:window-status-bell-style},#{E:window-status-style}}]'
+%hidden CURRENT='#[range=window|#{window_index} list=focus #{E:window-status-current-style}]'
+%hidden END='#[norange list=on default]#{?loop_last_flag,,#{E:window-status-separator}}'
+%hidden BLANK="#[align=left] #[list=on]#[list=left-marker] #[list=right-marker] #[list=on]#{W:#[range=window|#{window_index}]#{R: ,#{w;T:window-status-format}}$END,#[range=window|#{window_index} list=focus]#{R: ,#{w;T:window-status-current-format}}$END}#[nolist align=right]#{R: ,#{w;T:status-right}}"
+set -g status-format[0] "$BLANK"
+set -g status-format[1] "#[align=left] #[list=on]#[list=left-marker]<#[list=right-marker]>#[list=on]#{W:$TAB#{T:window-status-format}$END,$CURRENT#{T:window-status-current-format}$END}#[nolist align=right]#{T:status-right}"
+set -g status-format[2] "$BLANK"
+
+# Ctrl-b C: a new Claude chat in a window of its own, asking for a folder in ~/Code and a name
+bind-key -N "New Claude chat in its own window" C command-prompt -p "repo in ~/Code:,chat name:" {
+  if-shell "test -n '%2' && test -d ~/Code/'%1'" {
+    new-window -S -n "%2" -c "~/Code/%1" "~/.local/bin/claude -n '%2'"
+  } {
+    display-message -d 5000 "No chat opened: it needs a name and a folder in ~/Code"
+  }
+}
+
+# Ctrl-b a: the next window with a !
+bind-key -N "Next window with an alert" a next-window -a
+
+# Ctrl-b w and Ctrl-b Tab: the window list, picking within this device's view
+bind-key -N "Choose a window" w choose-tree -Zw "select-window -t '%%'"
+bind-key -N "Choose a window" Tab choose-tree -Zw "select-window -t '%%'"
 EOF
+
+# A running tmux reads its config only when it starts
+as_agent zsh -lc 'tmux source-file ~/.tmux.conf' &> /dev/null
 
 # Starts Claude and the dev servers in tmux unless they're running, launchd runs it at boot and every 5 minutes
 as_agent mkdir -p /Users/agent/Code
 as_agent tee /Users/agent/mini-up.sh > /dev/null <<'EOF'
 #!/bin/zsh -l
-# Starts the main Claude session in tmux, and each repo's dev server in a window named after it, unless running.
+# Starts the main chat in tmux, and each repo's dev server in a window named after it, unless running.
 # launchd runs it at boot and every 5 minutes; you can also run it yourself: zsh -l ~/mini-up.sh
 cd ~/Code || exit 1
 
@@ -258,10 +340,15 @@ done
 
 # Open a window in the main session, unless one with that name is there
 start() {
-  if ! tmux has-session -t main 2>/dev/null; then
+  # main was closed while a view kept its windows: it takes them back
+  if ! tmux has-session -t '=main' 2>/dev/null &&
+    tmux list-sessions -F '#{session_group}' 2>/dev/null | grep -qxF main; then
+    tmux new-session -d -s main -t main -c ~/Code 2>/dev/null
+  fi
+  if ! tmux has-session -t '=main' 2>/dev/null; then
     tmux new-session -d -s main -n "$1" -c "$2" "$3"
-  elif ! tmux list-windows -t main -F '#W' | grep -qxF "$1"; then
-    tmux new-window -d -t main -n "$1" -c "$2" "$3"
+  elif ! tmux list-windows -t '=main' -F '#W' | grep -qxF "$1"; then
+    tmux new-window -d -t '=main:' -n "$1" -c "$2" "$3"
   fi
 }
 
@@ -273,19 +360,36 @@ for dir in ~/Code/*(/N); do
 done
 EOF
 
-# Claude Code settings and instructions
+# Claude Code settings, adding the ones missing and keeping what's set, and instructions
 as_agent mkdir -p /Users/agent/.claude
-[ -e /Users/agent/.claude/settings.json ] || as_agent tee /Users/agent/.claude/settings.json > /dev/null <<'EOF'
-{
-  "remoteControlAtStartup": true,
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
-  "dialogExpiry": "never",
-  "modelSettings": { "claude-opus-5-5": { "effortLevel": "xhigh" } },
-  "permissions": { "defaultMode": "auto" },
-  "worktree": { "bgIsolation": "none" }
+as_agent python3 -I - <<'PY'
+import json, os
+
+path = '/Users/agent/.claude/settings.json'
+settings = json.load(open(path)) if os.path.exists(path) else {}
+defaults = {
+    'remoteControlAtStartup': True,
+    'inputNeededNotifEnabled': True,
+    'agentPushNotifEnabled': True,
+    'dialogExpiry': 'never',
+    'modelSettings': {'claude-opus-5-5': {'effortLevel': 'xhigh'}},
+    'permissions': {'defaultMode': 'auto'},
+    'worktree': {'bgIsolation': 'none'},
+    'preferredNotifChannel': 'terminal_bell',
 }
-EOF
+
+def add_missing(target, values):
+    for key, value in values.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            add_missing(target[key], value)
+        else:
+            target.setdefault(key, value)
+
+add_missing(settings, defaults)
+with open(path, 'w') as f:
+    json.dump(settings, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+PY
 printf "%s\n" "$claude_md" | as_agent tee /Users/agent/.claude/CLAUDE.md > /dev/null
 
 
@@ -391,23 +495,47 @@ EOF
 fi
 
 
+section "Phone on Tailscale"
+
+# The phone on the tailnet, or Termius can't find the mini. Device approval keeps a new device off it until approved
+if ! phone_on_tailnet; then
+  ask "Please put the phone on the tailnet, which Termius needs to reach the mini:"
+  cat <<'EOF'
+1. On the phone, install the Tailscale app from the Play Store
+2. Open it, sign in with the same account as the MacBook, and turn it on
+3. At login.tailscale.com → Machines, if the phone is marked Needs approval, choose Approve from its ⋯ menu
+The script carries on once the phone is on the tailnet. To skip it, please press Enter.
+EOF
+  until phone_on_tailnet || read -r -t 5; do :; done
+  if phone_on_tailnet; then
+    ok "The phone is on the tailnet"
+  else
+    warn "Phone skipped: Termius can't reach the mini until the phone is on the tailnet"
+  fi
+fi
+
+
 section "SSH keys"
 
 # SSH keys for both users, then SSH locked to them
+mini_ip="$(tailscale ip -4 2> /dev/null)"
 ask "Please add the SSH keys of the MacBook and the phone, for both your account and agent."
 cat <<EOF
 Until you press Enter, SSH also takes passwords, which is how the keys get here.
 
 ${bold}MacBook${reset}: in the dotfiles folder, run ./setup-macbook.sh again, which sends its key.
 
-${bold}Phone${reset}, in Termius, with Tailscale on:
-1. Keychain → + → New SSH Key → Generate new SSH Key: name it "phone → mini", key type ED25519, with a passphrase
-2. Hosts → + → New Host: label mini, address $mini_host, username agent. Save it.
-3. One more host: label mini-admin, the same address, username $(whoami). Save it.
-4. Keychain → tap the key → Export to… → mini → Export. If it asks for a username and password, use agent and
-   agent's password.
-5. Export the key again, to mini-admin. If it asks, use $(whoami) and your password on the mini.
+${bold}Phone${reset}, with the Tailscale app on:
+1. Install the Termius app from the Play Store, and open it
+2. Keychain → + → New SSH Key → Generate new SSH Key: name it "phone → mini", key type ED25519, with a passphrase
+3. Hosts → + → New Host: label mini, address $mini_host, username agent. Save it.
+4. One more host: label mini-admin, the same address, username $(whoami). Save it.
+5. Keychain → tap the key → Export to… → mini → Export. It logs in as agent, so if it asks, use username agent and
+   agent's password: the one you chose when this script created the agent user, not your own.
+6. Export the key again, to mini-admin. It logs in as $(whoami), so if it asks, use your own password on the mini.
 Exporting also attaches the key to the host, so mini and mini-admin log in with it from then on.
+Forgot agent's password? Set a new one from your account: sudo sysadminctl -resetPasswordFor agent -newPassword -
+If Termius says "no address" with the phone on the tailnet, use the mini's Tailscale IP instead: $mini_ip
 EOF
 echo
 ask "Or paste public keys here, one per line. Press Enter on an empty line when they're in: SSH then takes keys only."
@@ -421,7 +549,8 @@ if [ ! -e /etc/ssh/sshd_config.d/000-hardening.conf ]; then
     lock_ssh
     wait_for "Please test SSH, now limited to keys and the tailnet:" \
 "- MacBook: ssh mini 'echo key login works', then ssh -o PubkeyAuthentication=no mini, which must fail with \"Permission denied\"
-- Phone: in Termius, connect to mini and to mini-admin, which must log in with the key and not ask for a password
+- Phone: in Termius, connect to mini and to mini-admin, which must log in with the key and not ask for a password.
+  mini opens the main chat in tmux, which this script logs in to Claude next
 If a test fails, run sudo rm /etc/ssh/sshd_config.d/000-hardening.conf to allow passwords again, and check the keys."
   else
     warn "SSH stays open to passwords until both users have a key: please run this script again to add them"
@@ -441,19 +570,17 @@ fi
 
 section "GitHub login for agent"
 
-# With a token of its own
+# Its own login to all your repos, so Claude can manage them with gh; it never expires. GitHub's device login, since
+# the mini has no browser: the code goes in on another device. Kept in a file, since agent has no keychain
 if ! as_agent zsh -lc 'gh auth status' &> /dev/null; then
-  ask "Please make a GitHub token just for agent:"
+  ask "Please log agent in to GitHub, with access to all your repos:"
   cat <<'EOF'
-1. On github.com: Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token
-2. Expiration: 90 days. Repository access: only the repos the mini works on.
-3. Permissions → Repository permissions: Contents read and write, Pull requests read and write
-4. Generate it and copy the token
+1. When it asks to authenticate Git with your GitHub credentials, press Enter for yes
+2. Note the one-time code it shows, then press Enter
+3. On the phone or the MacBook, open github.com/login/device, enter the code and approve GitHub CLI
 EOF
-  prompt token "Please paste the token (hidden):" -s
-  echo
-  printf '%s\n' "$token" | as_agent zsh -lc 'gh auth login --with-token'
-  unset token
+  as_agent zsh -lc 'GH_BROWSER=true gh auth login --hostname github.com --git-protocol https --web \
+    --scopes workflow --insecure-storage'
 fi
 # Git over HTTPS with that login, set again each run since the dotfiles above replace ~/.gitconfig
 as_agent zsh -lc 'gh auth status &> /dev/null && gh auth setup-git'
@@ -474,4 +601,5 @@ fi
 echo
 ok "Done"
 ask "Please finish with README-mac-mini.md: pin each repo's dev server port in its Vite config (step 8), bring your
-Claude memory over from the MacBook (step 9), and check the boot job with a power cut (step 10)."
+Claude memory over from the MacBook (step 9), then ssh mini and answer the main chat's first questions, and check
+the boot job with a power cut (step 10)."

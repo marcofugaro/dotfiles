@@ -107,17 +107,20 @@ M4 base model rose from €729 at launch to €979.
  Android (Claude app, Termius, Chrome) ─┐                ┌─ Mac mini, always on
                                         ├── Tailscale ───┤   tmux → Claude Code sessions (Remote Control on)
  MacBook (claude.ai/code, VS Code,      │                │   dev servers on localhost:5173–5180, one per repo
-   Terminal) ───────────────────────────┘                │   node-webgpu tests, one at a time (GPU lock)
+   Tabby) ──────────────────────────────┘                │   node-webgpu tests, one at a time (GPU lock)
                                                          └─ tailscale serve → https://mini.<tailnet>.ts.net:<port>
 ```
 
-- **Talking to Claude:** Remote Control. Every session on the mini appears in the Claude app and on claude.ai/code, and
-  you get push notifications when a task finishes or needs a decision.
-- **Full control:** SSH over Tailscale. Use Termius on the phone, and Terminal or VS Code Remote-SSH on the MacBook.
+- **Talking to Claude:** in the terminal. `ssh mini` from the MacBook, or Termius on the phone, lands in the main chat,
+  and each chat you open in a terminal is a tmux window either device can show (step 10). Remote Control also lists
+  these chats in the Claude app and on claude.ai/code, and Claude pushes a notification to the phone when it decides
+  one is worth it, typically when a long task finishes or needs a decision.
+- **Full control:** SSH over Tailscale. Use Termius on the phone, and Tabby or VS Code Remote-SSH on the MacBook.
   VS Code opens the repo on the mini as if it were local; its terminal, git and the Claude Code extension all run on
   the mini.
-- **Starting work:** ask the main session to do a task in a worktree, or say "use a workflow". Parallel tasks each get
-  their own git worktree.
+- **Starting work:** a new chat for each task with `Ctrl-b C`, or ask the main chat; say "use a workflow" for a big
+  one. Chats edit the repos' own files, so the dev servers show their changes; your rules have parallel tasks on one
+  repo use a worktree, which its dev server doesn't serve.
 - **Testing:** agents run GPU tests on the mini's GPU through each repo's `scripts/gpu-lock.js`, so runs never
   overlap.
 - **Seeing results:** on the MacBook, VS Code forwards the dev servers' ports to `localhost`, so WebGPU works in Chrome.
@@ -131,7 +134,7 @@ M4 base model rose from €729 at launch to €979.
 
 | What | How |
 |---|---|
-| Change effort | Type `/effort high` (or `max`, …) in the Claude app or on claude.ai/code, or use the app's effort control. It applies to that session only. |
+| Change effort | `/effort high` (or `max`, …) in a chat sets the mini's default. The app's control: that chat only. |
 | Ultracode for the session | `/effort ultracode`; turn it off with `/effort ultracode off` |
 | Ultracode for one task | Put the word `ultracode` in the prompt. It works from the app too. |
 | Start a session with it | `claude --effort ultracode` (also sets effort to xhigh) |
@@ -174,8 +177,9 @@ The network side is. Tailscale exposes nothing to the internet, SSH over it is f
 outbound HTTPS connections. The real risks, most likely first:
 
 1. **The agent itself.** A malicious page an agent reads could trick it into sending out whatever it can read. So keep
-   nothing worth stealing on the mini: run Claude as a separate non-admin user, give it a GitHub token limited to this
-   repo, and leave your personal SSH keys, iCloud data and password manager off it.
+   little worth stealing on the mini: run Claude as a separate non-admin user, and leave your personal SSH keys, iCloud
+   data and password manager off it. Its GitHub login does reach all your repos (step 7), and Claude asks before every
+   `git push`.
 2. **Your claude.ai account becomes a way into the mini** while Remote Control is on. claude.ai has no two-factor login
    of its own yet, so protect the Google or email account you sign in with using a security key, and turn on "Require
    trusted devices".
@@ -209,8 +213,8 @@ while you're in the other city.
 | Home internet down | Nothing to do from afar; the mini is reachable again once the connection is back. |
 
 **FileVault is off,** because with it on, every power cut would stop at the unlock screen until someone types your
-password. By design the mini holds nothing you can't revoke in minutes: a GitHub token limited to this repo and your
-Claude login. The cost is that a thief has an easier time getting at what's on it, so Find My is on for your own
+password. By design the mini holds nothing you can't revoke in minutes: its GitHub login (step 7) and your Claude
+login. The cost is that a thief has an easier time getting at what's on it, so Find My is on for your own
 account (step 1): it shows where the mini is, locks or erases it, and its Activation Lock stops anyone else from setting
 it up again.
 
@@ -317,7 +321,9 @@ Download the dotfiles as a zip (see [README.md](README.md)), unzip them, and in 
    It does everything marked **Script** in this guide. When `tailscale up` prints a link, open it and approve the
    device; the mini is then `mini.<tailnet>.ts.net`. The Tailscale daemon starts at boot, before anyone logs in, and
    tagged devices never expire off the network. It doesn't update itself; `./setup-mac-mini.sh --update` does (step 14).
-3. On the phone, install Tailscale from the Play Store and sign in with the same account.
+3. On the phone, install Tailscale from the Play Store, sign in with the same account and turn it on. Then approve it,
+   since device approval is on: at login.tailscale.com → Machines, choose Approve from the phone's ⋯ menu. Until then
+   the phone can't reach the mini, so the script waits for it before the SSH keys.
 
 ### 6. SSH keys
 
@@ -347,42 +353,52 @@ To keep a way in when Tailscale is down, add your home network range to `AllowUs
 
 ### 7. GitHub access
 
-The mini gets its own token, limited to the repos it works on; don't copy your personal SSH key or your current gh
-token to it.
+`agent` gets a GitHub login of its own, as you, to all your repos, so Claude can manage them with `gh`: push, pull
+requests, issues, Actions. Your personal SSH key stays off the mini.
 
-1. On github.com: Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate.
-   - Repository access: only the repos the mini works on
-   - Permissions: Contents read/write, Pull requests read/write
-   - Expiration: 90 days
-2. **Script:** `setup-mac-mini.sh` asks for the token, with these same steps, and logs `agent` in to `gh` with it.
-   `agent`'s git name and email come from your `.gitconfig`.
+**Script:** `setup-mac-mini.sh` logs `agent` in with GitHub's device login, since the mini has no browser: open
+github.com/login/device on the phone or the MacBook, enter the code it shows and approve GitHub CLI.
+- The login never expires. It has `gh`'s usual access (`repo`, `read:org`, `gist`) plus `workflow`, so Claude can
+  edit Actions workflows too. For more, like deleting repos, run `gh auth refresh -s delete_repo --insecure-storage`
+  as `agent`.
+- It's kept in `agent`'s `~/.config/gh/hosts.yml`, not in a keychain, which `agent` doesn't have. Claude's own file
+  tools can't read it (step 9).
+- To cut it off, revoke **GitHub CLI** at github.com/settings/applications. That logs out `gh` on the MacBook too, so
+  run `gh auth login` there again.
+- `agent`'s git name and email come from your `.gitconfig`.
 
 ### 8. The repos
 
 **Script:** `setup-mac-mini.sh` asks which repos to clone, then for each one clones it as `agent` into `~/Code`, runs
 `npm ci`, and starts its dev server in a tmux window named after the repo (step 10). To add repos later, run
 `./setup-mac-mini.sh` again.
-- If the repo has GPU tests, run them once through its lock, for example `node scripts/gpu-lock.js -- npm test`. It's
-  the real check that SSH sessions get the mini's GPU.
+- If the repo has GPU tests, run them once through its lock over SSH, from the MacBook:
+  `ssh mini 'cd ~/Code/<repo> && node scripts/gpu-lock.js -- npm test'`. It's the real check that SSH sessions get the
+  mini's GPU.
 - **Ports:** each repo's dev server gets its own port from 5173 to 5180. Pin it in the repo's Vite config, so its
   address never changes:
   ```js
   server: { port: 5174, strictPort: true },
   ```
-  Without that, Vite takes the next free port, and the order you start them in decides which repo gets which.
+  Without `strictPort`, Vite counts the port as taken, since `tailscale serve` listens on it on the tailnet address,
+  and moves on past 5180, where the tailnet can't reach it.
 
 ### 9. Claude Code
 
 **Script:** `setup-mac-mini.sh` installs Claude Code for `agent`, in `~/.local/bin`, where it updates itself. It also
 writes:
-- `agent`'s `~/.claude/settings.json`, if there's none yet:
-  - `remoteControlAtStartup`: every session shows up in the Claude app without typing `/remote-control`.
-  - `inputNeededNotifEnabled` and `agentPushNotifEnabled` push to your phone when Claude needs input or has something
-    to report.
-  - `dialogExpiry: "never"`: a question sent to your phone or browser otherwise expires after 5 minutes and counts as
-    denied.
+- `agent`'s `~/.claude/settings.json`, adding these when they're missing and keeping everything else:
+  - `remoteControlAtStartup`: every chat in a window shows up in the Claude app without typing `/remote-control`.
+  - `inputNeededNotifEnabled` pushes to your phone when a permission prompt or a question waits, and
+    `agentPushNotifEnabled` lets Claude push when it decides to, typically when a long task finishes. Both need Remote
+    Control.
+  - `dialogExpiry: "never"`: a dialog sent to your phone or browser, like a model choice, otherwise expires after 5
+    minutes. Permission prompts and questions never expire.
   - `modelSettings` sets the effort to xhigh: a top-level `effortLevel` doesn't apply to Opus 5.5.
   - `permissions.defaultMode: "auto"`.
+  - `worktree.bgIsolation: "none"`: background chats edit the repo's own files, like the others (step 10).
+  - `preferredNotifChannel: "terminal_bell"`: a chat rings the bell when a permission prompt waits or a task finishes,
+    which tmux shows as a `!` on its window (step 10).
 - Machine-wide rules that `agent` can't loosen, in `/Library/Application Support/ClaudeCode/managed-settings.json`:
   - No session can switch to bypass mode.
   - Claude's own file tools can't read credentials. A script could still read them, which is why Claude runs as a
@@ -405,37 +421,139 @@ scp -r ~/.claude/projects/-Users-marcofugaro-Code-<repo>/memory mini:.claude/pro
 ```
 From then on the two copies drift apart; treat the mini's as the main one.
 
-### 10. Sessions that keep running: tmux
+### 10. Claude in the terminal
+
+Every Claude chat you open in a terminal lives on the mini, as `agent`, in the tmux session `main`: one window per
+chat, next to the dev servers. Each device gets its own view of that session: the MacBook and the phone see the same
+chats, but each picks which one to show, so you can start a chat on one and check it, or answer it, on the other. The
+chats keep running when you disconnect. Background chats, further down, and chats in VS Code's panel have no window.
 
 **Script:** for `agent`, `setup-mac-mini.sh` sets up:
-- `~/.tmux.conf`, with the mouse on and a long scrollback.
-- A few lines in `~/.zshrc` that land every SSH login in the tmux session `main`, like levelsio. They skip VS Code's
-  own terminals.
-- `~/mini-up.sh`, which waits for the internet, then starts the main Claude session in tmux window `claude`, in
-  `~/Code`, and each repo's dev server in a window named after the repo, skipping what's already running. A launchd
-  job runs it as `agent` at every boot, before anyone logs in, and every 5 minutes after, so Claude or a dev server
-  that stops comes back. To stop a dev server for good, move its repo out of `~/Code`. You can also run it yourself:
-  `zsh -l ~/mini-up.sh`.
+- `~/mini-up.sh`, which waits for the internet, then starts the main chat in the window `claude`, in `~/Code`, and
+  each repo's dev server in a window named after the repo, skipping what's already running. A launchd job runs it as
+  `agent` at every boot, before anyone logs in, and every 5 minutes after, so the main chat or a dev server that stops
+  comes back. To stop a dev server for good, close its window and move its repo out of `~/Code`. You can also run it
+  yourself: `zsh -l ~/mini-up.sh`.
+- Lines in `~/.zshrc` that open a view of `main`, on the main chat, at every SSH login, like levelsio. VS Code's
+  terminals skip it: type `chats` there. A view goes away when its device leaves; the windows stay.
+- `~/.tmux.conf`: the mouse on, a long scrollback, window names that stay as given, a red tab with a `!` instead of
+  a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, and the keys below. Re-running the
+  script reloads it.
+- `~/.zshenv`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It also makes a Mosh server
+  quit a day after its device went away, which closes that view.
+
+Check the boot job once with a power cut: switch the smart plug off and on, or run `sudo reboot`.
+1. About a minute later the main chat should appear in the Claude app, and `ssh mini` should land in it.
+2. In a shell window (`Ctrl-b c`), run a repo's GPU tests. A tmux started by launchd at boot runs outside any login,
+   and I couldn't confirm that macOS gives such processes the GPU. If the tests find no GPU, remove the job as `<you>`
+   with `sudo launchctl bootout system/local.mini-up`, again after each run of `setup-mac-mini.sh`, which reinstalls
+   it. Then, as `agent`, stop it with `tmux kill-server`, which ends every chat and dev server, and after each restart
+   run `zsh -l ~/mini-up.sh` yourself over SSH (it works from the phone too).
+
+**Connect**
+- **MacBook:** in Tabby, `ssh mini`.
+- **Phone:** with Tailscale on, tap the host `mini` in Termius, and leave its Startup Command empty: the mini opens
+  the view itself. In Android's settings for Termius, turn off battery optimization, or Android may drop the
+  connection when you switch apps. On a shaky connection, turn on **Use Mosh** in the host's settings: the session can
+  then survive network changes.
+- **VS Code:** its terminals don't open a view by themselves; type `chats`.
+
+You land in the main chat. Use `mini`, not `mini-admin`: Claude runs as `agent`, and each account has its own tmux and
+its own chats. Closing the terminal or losing the connection only closes your view: every chat keeps running, and the
+next connection lands in the main chat again.
+
+**The first time:** connect from the MacBook. The main chat may ask Claude's first-run questions, like whether to
+trust `~/Code`: answer them.
+
+**Get around**
+
+tmux keys are `Ctrl-b`, then a key. On the phone: tap **Ctrl** in Termius's key row, then `b`, then the key; check
+once that Ctrl lets go after the `b`, or tap it again. Case matters: `Ctrl-b C` (Shift+c) opens a chat, `Ctrl-b c` a
+shell. The bar at the bottom has a tab for each window: the one you're on is white, one that needs you is red with a
+`!`, and tapping a tab opens its window. On the phone, `<` or `>` at its edges means more windows, and the right end
+shows a `!` for each one that needs you.
+
+| Keys | |
+|---|---|
+| `Ctrl-b w` or `Ctrl-b Tab` | Every window, with a preview and its `!`: pick one with the arrows and Enter |
+| `Ctrl-b a` | The next window marked `!` |
+| `Ctrl-b n` / `Ctrl-b p` | The next / previous window |
+| `Ctrl-b C` | A new chat |
+| `Ctrl-b c` | A new shell, in `~/Code` |
+| `Ctrl-b ,` | Rename this window |
+| `Ctrl-b r` | Fit the window to this device again |
+| `Ctrl-b [` | Scroll back in a shell or a dev server's window; `q` stops |
+| `Ctrl-b d` | Leave tmux for a shell on the mini: `exit` disconnects, `chats` goes back |
+
+In a chat, scroll with the wheel, or PgUp and PgDn: Claude handles its own scrolling.
+
+**The main chat**
+
+The window `claude` holds the main chat, which starts at boot in `~/Code`, where it sees every repo. Talk to it from
+either device: both show the same conversation, so type from one at a time. `/clear` starts it over, and `/resume`
+brings back an earlier conversation. If it exits, with `/exit` or Ctrl+C twice, its window closes and the boot job
+starts a new main chat within 5 minutes.
+
+**Start a new chat**
+
+`Ctrl-b C`, then the repo's folder in `~/Code` and Enter (Enter alone for all of `~/Code`), then a name and Enter. A
+new window opens with Claude in that folder, ready for your first prompt, and the other device sees it in its list.
+- Name it after the task, like `fix-login`, not after the repo: a taken name, like a dev server's window or `claude`,
+  opens that window instead. A folder that isn't in `~/Code`, or no name, opens nothing.
+- The first chat in a folder may ask whether to trust it: answer yes.
+- A chat edits the repo's own files, so its dev server shows the changes. For parallel tasks on one repo, your rules
+  have Claude use a worktree, which the dev server doesn't serve.
+- `/exit` ends a chat and closes its window; its conversation stays. To continue it, `Ctrl-b C` with the same folder
+  and a name, then `/resume` and pick it.
+
+**Check on a chat from the other device**
+
+Connect, `Ctrl-b w`, and pick the chat: it's live, and you can answer it or give it the next task. A chat rings when a
+permission prompt has waited about six seconds, and about a minute after it finishes, if nobody has typed in it since
+and none of its background agents is still running. Its window then shows `!` on every device until one of them
+opens it, and `Ctrl-b a` jumps there.
+- Both devices can show the same chat. They then share its screen and scrolling, so use one at a time.
+- A window takes the size of the device that last pressed a key in it. The other device sees it cut off, or small with
+  dots around it, until it presses a key there: `Ctrl-b r` does that without typing into the chat.
+
+**Long tasks and ultracode**
+
+Start them in a chat like any task. `ultracode` in a prompt runs that task as a workflow; `/effort ultracode` lets
+Claude decide for every task in the chat ("Effort and ultracode from the phone", Part 1). Leaving with `Ctrl-b d`,
+switching windows or disconnecting keeps them running. `/exit` stops a running workflow, unless you choose **Move to
+background and exit** in the dialog it shows: the run then carries on as a background chat (below). To check on a run
+in its chat, open that chat:
+- `/workflows` shows each agent's progress: arrows and Enter for details, `p` to pause or resume, `x` to stop.
+- `/tasks` lists the chat's background work.
+- Esc or Ctrl+C in a chat that's working interrupts it.
+
+**Background chats**
+
+For a task you don't need to watch, start a chat without a window, from a shell in the repo (`Ctrl-b c`, `cd <repo>`):
+```sh
+claude --bg -n <name> "<prompt>"
+```
+- `claude agents` lists them, on either device, with what each one is doing: arrows to move, Space to peek (you can
+  answer a question there), Enter or → to open one (a permission prompt needs this), Ctrl+X to stop one. In an open
+  one, ← on an empty prompt goes back to the list; Ctrl+C twice leaves the list.
+- `claude logs <name>` prints the latest output of one, and `claude attach <name>` opens one that's running.
+- They have no window, so no `!`: check on them with `claude agents`.
+- They edit the repo's own files too (step 9). A restart of the mini stops them: in `claude agents`, press Enter on
+  one, twice if it says stopped, then ask it to carry on.
+- Open each from one device at a time: the docs don't say whether two can at once.
+
+**Dev servers**
 
 The script starts the dev servers of the repos it clones. To start one yourself, in its own window named after the
 repo, which keeps running after you disconnect:
 ```sh
-tmux new-window -t main -n <repo> -c ~/Code/<repo> "npm run dev"
+tmux new-window -t main: -n <repo> -c ~/Code/<repo> "npm run dev"
 ```
 
-Check the boot job once with a power cut: switch the smart plug off and on, or run `sudo reboot`.
-1. About a minute later the main session should appear in the Claude app, and `ssh mini` should land in the tmux
-   session.
-2. Run a repo's GPU tests in it. A tmux started by launchd at boot runs outside any login, and I couldn't confirm that
-   macOS gives such processes the GPU. If the tests find no GPU, remove the job with
-   `sudo launchctl bootout system/local.mini-up`, stop the session it started with `tmux kill-server`, and from then
-   on, after each restart, run `zsh -l ~/mini-up.sh` yourself over SSH (it works from the phone too).
-
-- **A parallel task in its own worktree:** open a new tmux window and run `claude -w <name> -n <name>`, or ask the main
-  session from your phone to do the task in a worktree.
-- **Without tmux:** `claude --bg` starts a background session, `claude agents` lists them, and `claude attach <id>`
-  opens one.
-- **tmux keys:** `Ctrl-b c` new window, `Ctrl-b n` / `Ctrl-b p` next and previous window, `Ctrl-b d` detach.
+**Claude's keys in tmux**
+- A new line in a prompt: Ctrl+J.
+- Claude's Ctrl+B, which sends a running command to the background: press Ctrl-b twice, since tmux takes the first.
+- A garbled screen: Ctrl+L redraws it.
 
 ### 11. Seeing results
 
@@ -462,12 +580,14 @@ tailnet address, where only your devices can reach it. Open a repo's dev server 
 
 ### 12. Phone
 
-- **Tailscale:** the same account as the other devices.
+- **Tailscale:** the same account as the other devices, approved under Machines (step 5).
 - **Claude:** the Code tab lists the mini's sessions. Allow notifications.
-- **Termius:** the SSH hosts `mini` and `mini-admin` from step 6. Turn on Mosh for them if your connection is flaky.
+- **Termius:** the SSH hosts `mini` and `mini-admin` from step 6; step 10 shows how to use Claude with `mini`. Turn on
+  Mosh for `mini` if your connection is flaky.
 - **Chrome:** for the dev servers' addresses.
 
-**Script:** Mosh's server is let through the mini's firewall.
+**Script:** Mosh's server is let through the mini's firewall, and Homebrew is on `agent`'s path for commands run over
+SSH, where Mosh looks for it.
 
 ### 13. Accounts
 
@@ -479,15 +599,16 @@ tailnet address, where only your devices can reach it. Open a repo's dev server 
 
 ### 14. Maintenance
 
-- **Weekly updates:** as `<you>`, in the dotfiles folder and inside tmux, run `./setup-mac-mini.sh --update`. It runs
-  `brew update && brew upgrade`, then lets the new Mosh (and the lamp's Node) through the firewall again and reinstalls
+- **Weekly updates:** as `<you>` (`ssh mini-admin`), in the dotfiles folder and inside a tmux of your own
+  (`tmux new -A -s admin`), run `./setup-mac-mini.sh --update`. It runs `brew update && brew upgrade`, then lets the new
+  Mosh (and the lamp's Node) through the firewall again and reinstalls
   the Tailscale daemon, which Homebrew doesn't update. Restarting Tailscale can drop SSH sessions over it for a moment.
-  Claude Code updates itself (check with `claude doctor`).
+  Claude Code updates itself (check with `claude doctor` in a shell window of `mini`).
 - **macOS updates:** the mini downloads them by itself and installs the ones that don't need a restart. Install the
   rest when it suits you: `sudo softwareupdate --install --all --restart`.
 - **Planned restart:** `sudo reboot`.
-- **Power cut:** the mini starts again when power returns, and launchd brings back the main Claude session and the dev
-  servers once the internet is back (step 10).
+- **Power cut:** the mini starts again when power returns, and launchd brings back the main chat and the dev servers
+  once the internet is back (step 10).
 - **Frozen mini:** switch the smart plug off and on from its app; the mini boots when power returns.
 - **Lost phone:**
   1. In the Tailscale admin console, remove the phone under Machines. Access stops immediately.
@@ -509,11 +630,13 @@ through reboots with nobody logged in, and Claude can change the colors and anim
 - [ ] FileVault off; Location Services and Find My on, with the mini on the map at icloud.com/find; updates installed
 - [ ] Ethernet if you can, Wi-Fi left on; smart plug that turns back on after a power cut; UPS if you have one
 - [ ] Tailscale console: policy set, device approval on, MagicDNS and HTTPS certificates on, no Funnel
-- [ ] `setup.sh` and `setup-mac-mini.sh` run; the mini approved in Tailscale; Remote Login on
+- [ ] `setup.sh` and `setup-mac-mini.sh` run; the mini and the phone approved in Tailscale; Remote Login on
 - [ ] SSH keys from the MacBook and the phone; `--lock-ssh` run and password logins refused
-- [ ] Fine-grained GitHub token; repos cloned, each with its own port; GPU tests pass over SSH
+- [ ] `agent` logged in to GitHub; repos cloned, each with its own port; GPU tests pass over SSH
 - [ ] Claude Code logged in as `agent` with claude.ai; memory copied
-- [ ] The main Claude session comes back after a restart, and GPU tests pass there
+- [ ] The main chat comes back after a restart, and GPU tests pass in a shell window (`Ctrl-b c`) there
+- [ ] `ssh mini` and Termius `mini` both land in the main chat; each device switches chats on its own; a chat opened
+  with `Ctrl-b C` on one shows up on the other, with a `!` while it waits on a permission prompt
 - [ ] VS Code Remote-SSH works; the dev servers open at `https://mini.<tailnet>.ts.net:<port>` on the phone
 - [ ] Tried everything from outside the home network: SSH, VS Code, the Claude app
 - [ ] Security key on the claude.ai sign-in account; trusted devices on

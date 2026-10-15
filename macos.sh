@@ -81,6 +81,11 @@ killall cfprefsd
 # Hide recent apps in the Dock
 defaults write com.apple.dock "show-recents" -bool "false"
 
+# Turn off Handoff, which adds the other devices' apps to the end of the Dock
+defaults -currentHost write com.apple.coreservices.useractivityd ActivityAdvertisingAllowed -bool false
+defaults -currentHost write com.apple.coreservices.useractivityd ActivityReceivingAllowed -bool false
+killall useractivityd
+
 # Restart the dock
 killall Dock
 

@@ -102,8 +102,10 @@ PATH="$HOME/.local/bin:$PATH"
 # build native extensions for arm64
 ARCHFLAGS="-arch arm64"
 
-# case-insensitive tab completion
-autoload -Uz compinit && compinit
+# case-insensitive tab completion; an account that doesn't own Homebrew, like the mini's agent, trusts its
+# completions instead of asking about them in every shell
+autoload -Uz compinit
+if [[ -O /opt/homebrew ]]; then compinit; else compinit -u; fi
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # emacs keybindings, which shift-select builds on
