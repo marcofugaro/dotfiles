@@ -323,12 +323,16 @@ bind-key -N "New Claude chat in its own window" -n C-n command-prompt -p "repo i
 # Ctrl-t: a new shell, like Ctrl-b c
 bind-key -N "New shell" -n C-t new-window
 
-# Ctrl-w and Ctrl-b w: the window list, picking within this device's view
-bind-key -N "Choose a window" -n C-w choose-tree -Zw "select-window -t '%%'"
-bind-key -N "Choose a window" w choose-tree -Zw "select-window -t '%%'"
+# Ctrl-w: close this window, after a y, like Ctrl-b &
+bind-key -N "Close this window" -n C-w confirm-before -p "Close #W? (y/n)" kill-window
 
-# Ctrl-a: the next window with a !
-bind-key -N "Next window with an alert" -n C-a next-window -a
+# Ctrl-b w, n and p: nothing, instead of tmux's window list and next and previous window
+unbind-key w
+unbind-key n
+unbind-key p
+
+# Ctrl-a: to the program in the window
+unbind-key -n C-a
 
 # Ctrl-f: fit the window to this device, like Ctrl-b r
 bind-key -N "Fit the window to this device" -n C-f refresh-client

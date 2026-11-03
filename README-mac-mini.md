@@ -475,12 +475,10 @@ tapping a tab opens its window. On the phone, `<` or `>` at its edges means more
 
 | Keys | |
 |---|---|
-| `Ctrl-w` | Every window, with a preview and its `!`: pick one with the arrows and Enter |
-| `Ctrl-a` | The next window marked `!` |
 | `Ctrl-n` | A new chat |
 | `Ctrl-t` | A new shell, in `~/Code` |
+| `Ctrl-w` | Close this window, after a `y`: whatever runs in it stops |
 | `Ctrl-f` | Fit the window to this device again |
-| `Ctrl-b n` / `Ctrl-b p` | The next / previous window |
 | `Ctrl-b ,` | Rename this window |
 | `Ctrl-b [` | Scroll back in a shell or a dev server's window; `q` stops |
 | `Ctrl-b d` | Leave tmux for a shell on the mini: `exit` disconnects, `chats` goes back |
@@ -497,7 +495,7 @@ starts a new main chat within 5 minutes.
 **Start a new chat**
 
 `Ctrl-n`, then the repo's folder in `~/Code` and Enter (Enter alone for all of `~/Code`), then a name and Enter. A
-new window opens with Claude in that folder, ready for your first prompt, and the other device sees it in its list.
+new window opens with Claude in that folder, ready for your first prompt, and the other device sees its tab.
 - Name it after the task, like `fix-login`, not after the repo: a taken name, like a dev server's window or `claude`,
   opens that window instead. A folder that isn't in `~/Code`, or no name, opens nothing.
 - The first chat in a folder may ask whether to trust it: answer yes.
@@ -508,10 +506,10 @@ new window opens with Claude in that folder, ready for your first prompt, and th
 
 **Check on a chat from the other device**
 
-Connect, `Ctrl-w`, and pick the chat: it's live, and you can answer it or give it the next task. A chat rings when a
+Connect and open the chat's tab: it's live, and you can answer it or give it the next task. A chat rings when a
 permission prompt has waited about six seconds, and about a minute after it finishes, if nobody has typed in it since
 and none of its background agents is still running. Its window then shows `!` on every device until one of them
-opens it, and `Ctrl-a` jumps there.
+opens it.
 - Both devices can show the same chat. They then share its screen and scrolling, so use one at a time.
 - A window takes the size of the device that last pressed a key in it. The other device sees it cut off, or small with
   dots around it, until it presses a key there: `Ctrl-f` does that without typing into the chat.
@@ -553,9 +551,8 @@ tmux new-window -t main: -n <repo> -c ~/Code/<repo> "npm run dev"
 **Claude's keys in tmux**
 - A new line in a prompt: Ctrl+J.
 - Claude's Ctrl+B, which sends a running command to the background: press Ctrl-b twice, since tmux takes the first.
-- tmux takes Ctrl+N, Ctrl+T, Ctrl+W, Ctrl+A and Ctrl+F, so Claude and the shell never get them. ↓ does what Ctrl+N
-  did; in Tabby, ⌥⌫ deletes a word and ⌘← goes to the start of a line. Claude's task list (Ctrl+T) and Find in
-  `claude agents` (Ctrl+F) are out of reach.
+- tmux takes Ctrl+N, Ctrl+T, Ctrl+W and Ctrl+F, so Claude and the shell never get them. ↓ does what Ctrl+N did;
+  in Tabby, ⌥⌫ deletes a word. Claude's task list (Ctrl+T) and Find in `claude agents` (Ctrl+F) are out of reach.
 - A garbled screen: Ctrl+L redraws it.
 
 ### 11. Seeing results
