@@ -6,8 +6,8 @@ nobody logged in.
 
 | Status | Default look |
 |---|---|
-| Working | A blue gradient spinning around each cube, one turn every 2 seconds |
-| Needs you: a permission prompt, a question or a plan to approve | A pink-to-purple pulse, every 1.2 seconds |
+| Working | Yellow rings rippling out from the middle of each cube over a deep ember red, one every 2 seconds |
+| Needs you: a permission prompt, a question or a plan to approve | A white-to-orange pulse, every 1.2 seconds |
 | Done, your turn | A slow warm-orange breathe; turns off after 30 minutes |
 | No session running | Off |
 
@@ -48,7 +48,7 @@ After step 1, `setup-mac-mini-status-lamp.sh` in the dotfiles folder does steps 
 
 1. Set it up with the Yeelight app, on the same Wi-Fi as the mini. If the cube's settings show **LAN Control**, turn
    it on.
-2. Give it a fixed address in your router (a DHCP reservation).
+2. Give it a fixed address in your router (a DHCP reservation). The setup suggests `192.168.1.63`.
 3. Check the mini can reach it: `nc -z <cube IP> 55443 && echo reachable`.
 
 ### 2. Let music mode through the mini's firewall (as `<you>`)
@@ -133,13 +133,14 @@ Add this `hooks` block to `~/.claude/settings.json`, next to the settings from t
   "SessionEnd": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh off" }] }]
 }
 ```
-Start a new session and send a prompt: the cube spins while Claude works, pulses when it asks you something, and
+Start a new session and send a prompt: the cube ripples while Claude works, pulses when it asks you something, and
 breathes orange when it's done.
 
 ## Colors and animations
 
 Everything is in `~/.claude/yeelight-cube/cube.json`. Edit it, or ask Claude to ("make the working state green and
-slower"): `cube.mjs` picks up the change within a second, without a restart.
+slower"): `cube.mjs` picks up the change within a second, without a restart. `setup-mac-mini-status-lamp.sh` rewrites
+it from `cube.example.json`, keeping only the cube's address and cubes, so make lasting changes there.
 
 Each status (`working`, `input`, `idle`) has:
 - `colors`: two colors, the first for the middle of each cube and the second for its edges.
@@ -156,7 +157,7 @@ Each status (`working`, `input`, `idle`) has:
 
 Other settings:
 - `idleOffMinutes`: how long the "done" state stays lit; `0` keeps it on.
-- `fps`: frames per second; takes effect when `cube.mjs` restarts.
+- `fps`: frames per second; takes effect when `cube.mjs` restarts. 30 stutters on the real cube.
 - `port` and `musicPort`: the cube's port (55443) and the port it connects back to (54321), if you need to change them.
 
 The animations are drawn around the middle of each cube, so they look the same however the cubes are stacked, and
@@ -165,6 +166,8 @@ every cube in a stack shows the same animation.
 ## Good to know
 
 - **Logs:** `/tmp/claude-lamp/cube.log` records status changes, connections and errors.
+- **Interrupting Claude** (`Esc`) fires no hook, so `cube.mjs` checks each busy session's transcript once a second
+  and sets the session idle when it ends with the interrupt.
 - **Sessions that vanish** without ending (a crash, a closed terminal) stop counting after 2 hours without events.
 - **If the cube is offline,** Claude isn't slowed down: the hook only writes a file. `cube.mjs` retries every
   10 seconds.
@@ -184,5 +187,5 @@ All of this ran against a stand-in cube that speaks the same protocol:
 
 Not yet tried on a real cube:
 - The protocol comes from YeelightMatrix, which was written for the Cube Matrix; the Panel is its `5x5_blur` type.
-- Whether the real cube connects back for music mode and keeps up with 12 frames a second.
+- Whether the real cube connects back for music mode and keeps up with 24 frames a second.
 - Whether the Yeelight app shows a LAN Control switch for the cube.

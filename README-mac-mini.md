@@ -263,17 +263,8 @@ Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (ste
   stealth mode, and the built-in SSH server stays allowed.
 - **Script:** Remote Login (System Settings → General → Sharing) is on, for "Only these users": `<you>` and `agent`.
   Leave "Allow full disk access for remote users" off.
-- Screen Sharing stays off. For the rare times you need the desktop from afar, turn it on as `<you>` over SSH, and
-  off again when you're done:
-  ```sh
-  sudo launchctl enable system/com.apple.screensharing
-  sudo launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.screensharing.plist
-  # off again
-  sudo launchctl bootout system/com.apple.screensharing
-  sudo launchctl disable system/com.apple.screensharing
-  ```
-  The tailnet lets only SSH through to the mini, so connect through it from the MacBook:
-  `ssh -N -L 5901:localhost:5900 mini`, then `open vnc://localhost:5901` and log in as `<you>`.
+- **Script:** Screen Sharing is on, for "Only these users": `<you>`. From the MacBook, `open vnc://mini` (or
+  `vnc://mini.<tailnet>.ts.net`) and log in as `<you>`; the Screen Sharing app keeps it in its list. It also answers on the home network, since macOS can't limit it to the tailnet.
 - **Ethernet:** connect the mini by cable if you can, it's steadier than Wi-Fi. **Script:** Wi-Fi stays on either
   way, for Find My.
 - **For running it from afar:** plug the mini into a smart plug you can switch from your phone, and set the plug to
@@ -303,13 +294,14 @@ Download the dotfiles as a zip (see [README.md](README.md)), unzip them, and in 
    - **DNS:** turn on MagicDNS and HTTPS certificates.
    - **Settings → Device management:** turn on device approval, so new devices need your OK.
    - **Access controls:** replace the default allow-all policy with this one. Your devices can reach the mini, but the
-     mini can't reach them. Port 22 is SSH, 5173–5180 are the dev servers, and the UDP range is Mosh.
+     mini can't reach them. Port 22 is SSH, 5900 is Screen Sharing, 5173–5180 are the dev servers, and the UDP range
+     is Mosh.
      ```json
      {
        "tagOwners": { "tag:mini": ["autogroup:owner", "autogroup:admin"] },
        "grants": [
          { "src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"] },
-         { "src": ["autogroup:member"], "dst": ["tag:mini"], "ip": ["tcp:22", "tcp:5173-5180", "udp:60000-61000"] }
+         { "src": ["autogroup:member"], "dst": ["tag:mini"], "ip": ["tcp:22", "tcp:5900", "tcp:5173-5180", "udp:60000-61000"] }
        ]
      }
      ```
@@ -618,7 +610,7 @@ SSH, where Mosh looks for it.
 
 ### 15. Optional: a status lamp
 
-A Yeelight Cube on your desk can animate what Claude is doing: a spinning blue gradient while it works, a pink pulse
+A Yeelight Cube on your desk can animate what Claude is doing: yellow ripples while it works, a white and orange pulse
 when it needs you, a slow orange breathe when it's done. The mini drives it directly over Wi-Fi, so it keeps working
 through reboots with nobody logged in, and Claude can change the colors and animations. Parts list and how it works:
 [yeelight-cube/README.md](yeelight-cube/README.md). Once the cube is on your Wi-Fi with a fixed address, run
@@ -630,7 +622,8 @@ through reboots with nobody logged in, and Claude can change the colors and anim
 - [ ] FileVault off; Location Services and Find My on, with the mini on the map at icloud.com/find; updates installed
 - [ ] Ethernet if you can, Wi-Fi left on; smart plug that turns back on after a power cut; UPS if you have one
 - [ ] Tailscale console: policy set, device approval on, MagicDNS and HTTPS certificates on, no Funnel
-- [ ] `setup.sh` and `setup-mac-mini.sh` run; the mini and the phone approved in Tailscale; Remote Login on
+- [ ] `setup.sh` and `setup-mac-mini.sh` run; the mini and the phone approved in Tailscale; Remote Login and Screen
+  Sharing on
 - [ ] SSH keys from the MacBook and the phone; `--lock-ssh` run and password logins refused
 - [ ] `agent` logged in to GitHub; repos cloned, each with its own port; GPU tests pass over SSH
 - [ ] Claude Code logged in as `agent` with claude.ai; memory copied

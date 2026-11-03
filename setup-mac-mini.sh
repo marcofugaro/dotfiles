@@ -143,9 +143,15 @@ sudo pmset -a sleep 0 disksleep 0 womp 1 autorestart 1 autorestartatconnect 1
 wifi="$(networksetup -listallhardwareports | awk '/Wi-Fi/ { getline; print $2 }')"
 [ -n "$wifi" ] && sudo networksetup -setairportpower "$wifi" on
 
-# Firewall with stealth mode, the built-in SSH server stays allowed
+# Firewall with stealth mode, the built-in SSH and Screen Sharing servers stay allowed
 sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on
 sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setstealthmode on
+
+# Screen Sharing for only you: the access group is what "Only these users" lists
+sudo dseditgroup -o read com.apple.access_screensharing &> /dev/null || sudo dseditgroup -o create -q com.apple.access_screensharing
+sudo dseditgroup -o edit -a "$(whoami)" -t user com.apple.access_screensharing
+sudo launchctl enable system/com.apple.screensharing
+sudo launchctl print system/com.apple.screensharing &> /dev/null || sudo launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.screensharing.plist
 
 # Make the admin home folder private
 sudo chmod 700 "$HOME"
@@ -323,8 +329,8 @@ bind-key -N "New Claude chat in its own window" -n C-n command-prompt -p "repo i
 # Ctrl-t: a new shell, like Ctrl-b c
 bind-key -N "New shell" -n C-t new-window
 
-# Ctrl-w: close this window, after a y, like Ctrl-b &
-bind-key -N "Close this window" -n C-w confirm-before -p "Close #W? (y/n)" kill-window
+# Ctrl-w: close this window, like Ctrl-b & without the question
+bind-key -N "Close this window" -n C-w kill-window
 
 # Ctrl-b w, n and p: nothing, instead of tmux's window list and next and previous window
 unbind-key w

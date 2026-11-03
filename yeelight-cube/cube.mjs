@@ -11,12 +11,14 @@
  * over "music mode", a connection the cube opens back to this process and doesn't rate-limit; without it the cube
  * still shows each status, refreshed every few seconds.
  */
-import { appendFileSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { appendFileSync, closeSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs'
 import { connect, createServer } from 'node:net'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const CONFIG = join(dirname(fileURLToPath(import.meta.url)), 'cube.json')
+const HOOK = join(dirname(fileURLToPath(import.meta.url)), 'lamp-hook.sh')
 const DIR = '/tmp/claude-lamp'
 const STATE = join(DIR, '.state')
 const TIMEOUT_MS = 3000
@@ -109,6 +111,8 @@ const send = (commands) =>
       const [name, params] = typeof command === 'function' ? command(socket) : command
       method = name
       socket.write(`${JSON.stringify({ id: sent, method, params })}\r\n`)
+      // The cube never acknowledges update_leds
+      if (method === 'update_leds') next()
     }
     socket.on('connect', next)
     socket.on('data', (chunk) => {
@@ -238,3 +242,58 @@ setInterval(
   },
   1000 / (config.fps ?? 12),
 )
+
+// The last message in a transcript, if the transcript changed after the given time
+const TAIL_BYTES = 65536
+const lastMessage = (transcript, since) => {
+  let fd
+  try {
+    const { size, mtimeMs } = statSync(transcript)
+    if (mtimeMs <= since) return null
+    fd = openSync(transcript, 'r')
+    const length = Math.min(size, TAIL_BYTES)
+    const tail = Buffer.alloc(length)
+    readSync(fd, tail, 0, length, size - length)
+    for (const line of tail.toString('utf8').split('\n').reverse()) {
+      let entry
+      try {
+        entry = JSON.parse(line)
+      } catch {
+        continue
+      }
+      if (entry.type === 'user' || entry.type === 'assistant') return entry
+    }
+    return null
+  } catch {
+    return null
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+  }
+}
+
+const isInterrupt = (entry) =>
+  entry?.type === 'user' &&
+  Array.isArray(entry.message?.content) &&
+  entry.message.content.some((part) => part.type === 'text' && part.text?.startsWith('[Request interrupted by user'))
+
+// An interrupt fires no hook, so a busy session whose transcript ends with one since its last hook goes idle
+const checkInterrupts = () => {
+  for (const session of readdirSync(DIR)) {
+    if (session.startsWith('.') || session.endsWith('.log')) continue
+    const file = join(DIR, session)
+    const [status, transcript] = read(file).split('\n')
+    const since = statSync(file, { throwIfNoEntry: false })?.mtimeMs
+    if ((status !== 'working' && status !== 'input') || !transcript || !since) continue
+    if (!isInterrupt(lastMessage(transcript, since))) continue
+    log(`session ${session} interrupted`)
+    spawnSync('/bin/bash', [HOOK, 'idle'], { input: JSON.stringify({ session_id: session }) })
+  }
+}
+
+setInterval(() => {
+  try {
+    checkInterrupts()
+  } catch (error) {
+    log(`interrupts: ${error.stack}`)
+  }
+}, 1000)
