@@ -8,8 +8,8 @@ nobody logged in.
 |---|---|
 | Working | Yellow rings rippling out from the middle of each cube over a deep ember red, one every 2 seconds |
 | Needs you: a permission prompt, a question or a plan to approve | A white-to-orange pulse, every 1.2 seconds |
-| Done, your turn | A slow warm-orange breathe; turns off after 30 minutes |
-| No session running | Off |
+| Done, your turn | A slow warm-orange breathe; goes dark after 30 minutes |
+| No session running | Dark |
 
 With several sessions running, the most urgent state wins: needs you, then working, then done. Colors, animations and
 speeds are yours to change, and Claude can change them too (see [Colors and animations](#colors-and-animations)).
@@ -166,6 +166,8 @@ every cube in a stack shows the same animation.
 ## Good to know
 
 - **Logs:** `/tmp/claude-lamp/cube.log` records status changes, connections and errors.
+- **Dark, not off:** the cube stays powered on and shows black frames over music mode, so it lights up again on the
+  next frame. A powered-off cube stopped answering for minutes when woken, until it restarted.
 - **Interrupting Claude** (`Esc`) fires no hook, so `cube.mjs` checks each busy session's transcript once a second
   and sets the session idle when it ends with the interrupt.
 - **Sessions that vanish** without ending (a crash, a closed terminal) stop counting after 2 hours without events.
@@ -180,7 +182,7 @@ All of this ran against a stand-in cube that speaks the same protocol:
 - **Commands:** the order (power on, per-LED mode, frame, music mode), the gradient's middle and edge colors, a
   three-cube frame of the right size, and a clean retry when the cube is unreachable.
 - **Animations:** a 14-second run sent about 12 frames a second over music mode. The spin rotated the edges around a
-  steady middle, the pulse swung from 19 to 183 brightness (out of 255), and the "done" state powered off on time. A
+  steady middle, the pulse swung from 19 to 183 brightness (out of 255), and the "done" state went dark on time. A
   color change in `cube.json` showed up within a second.
 - **Hook:** a replay of two overlapping sessions (prompts, tool calls, a question, a permission prompt, finishing,
   ending) gave the right status after all 12 events.

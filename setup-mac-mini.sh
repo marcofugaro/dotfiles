@@ -280,8 +280,10 @@ as_agent tee /Users/agent/.tmux.conf > /dev/null <<'EOF'
 set -g mouse on
 set -g history-limit 100000
 
-# Window names stay as given, instead of following the program running in them
-set -g automatic-rename off
+# A window opened without a name, like a new shell, is named after its folder as the prompt shows it, like ~ or
+# ~/Code, and follows cd; one opened with a name, like a chat or a dev server, keeps it
+set -g automatic-rename on
+set -g automatic-rename-format "#{?#{==:#{pane_current_path},$HOME},~,#{s|^$HOME/|~/|:pane_current_path}}"
 
 # The terminal's tab title: user@host and the window, like agent@mini: fix-login
 set -g set-titles on

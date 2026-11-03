@@ -9,7 +9,8 @@
  * cubes are stacked. It speaks Yeelight's LAN protocol (JSON lines over TCP, port 55443) the way the YeelightMatrix
  * library does: set_power, activate_fx_mode "direct", and update_leds with one base64 RGB triple per LED. Frames go
  * over "music mode", a connection the cube opens back to this process and doesn't rate-limit; without it the cube
- * still shows each status, refreshed every few seconds.
+ * still shows each status, refreshed every few seconds. Dark is black frames, never set_power off: a cube that's
+ * powered off can take minutes to answer again, until it restarts.
  */
 import { spawnSync } from 'node:child_process'
 import { appendFileSync, closeSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs'
@@ -80,6 +81,7 @@ for (let y = 0; y < 5; y++) {
 }
 // A 1x1 spotlight samples a point off the centre, so a spinning status still changes its colour
 const SPOT = [[0.5, 0]]
+const DARK = { colors: ['#000000', '#000000'], animation: 'still' }
 
 const render = (look, ms) => {
   const [a, b] = look.colors.map(rgb)
@@ -96,7 +98,9 @@ const encode = (leds) =>
 const send = (commands) =>
   new Promise((resolve, reject) => {
     const socket = connect(config.port ?? 55443, config.ip)
-    socket.setTimeout(TIMEOUT_MS, () => socket.destroy(new Error('timed out')))
+    socket.setTimeout(TIMEOUT_MS, () =>
+      socket.destroy(new Error(socket.connecting ? 'connect timed out' : `${method} timed out`)),
+    )
     socket.on('error', reject)
     let buffer = ''
     let sent = 0
@@ -151,7 +155,9 @@ createServer((socket) => {
   socket.setNoDelay(true)
   socket.on('error', () => {})
   socket.on('close', () => {
-    if (stream === socket) stream = null
+    if (stream !== socket) return
+    stream = null
+    log('music mode closed')
   })
   log('music mode connected')
 })
@@ -163,7 +169,7 @@ createServer((socket) => {
 
 let shown = null // the status on the cube
 let changedAt = Date.now()
-let lit = true // assume on, so the first dark frame turns it off
+let dark = false
 let pending = false // a command connection is open
 let retryAt = 0
 let last = null // the last frame's LEDs, to fade from
@@ -200,18 +206,18 @@ const tick = () => {
 
   const look = config.states[shown]
   const idleOver = shown === 'idle' && config.idleOffMinutes > 0 && now - changedAt > config.idleOffMinutes * 60000
-  if (!look || idleOver) {
-    last = null
-    if (lit && !pending && now >= retryAt) control([['set_power', ['off', 'smooth', 800]]], () => (lit = false))
-    return
+  if ((!look || idleOver) !== dark) {
+    dark = !dark
+    fadeFrom = last
+    fadeAt = now
   }
 
-  let leds = render(look, now - changedAt)
+  let leds = render(dark ? DARK : look, now - changedAt)
   if (fadeFrom && now - fadeAt < FADE_MS) leds = leds.map((c, i) => mix(fadeFrom[i] ?? c, c, (now - fadeAt) / FADE_MS))
   last = leds
   const frame = encode(leds)
 
-  if (stream && lit) {
+  if (stream) {
     stream.write(`${JSON.stringify({ id: 1, method: 'update_leds', params: [frame] })}\r\n`)
     return
   }
@@ -225,7 +231,6 @@ const tick = () => {
         (socket) => ['set_music', [1, socket.localAddress.replace('::ffff:', ''), MUSIC_PORT]],
       ],
       () => {
-        lit = true
         if (!stream) retryAt = Date.now() + RETRY_MS
       },
     )
