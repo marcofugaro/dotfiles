@@ -35,8 +35,8 @@ hotkeys:
     - ⌥-Left
   next-word:
     - ⌥-Right
-  delete-previous-word:
-    - ⌥-Backspace
+  # None: ⌥⌫ then sends Esc-Delete, which deletes a word; Tabby's own sends Ctrl-W, which tmux takes to close the window
+  delete-previous-word: []
   delete-line:
     - ⌘-Backspace
   delete-next-word:

@@ -168,8 +168,11 @@ killall Dock
 
 section "Packages and apps"
 
-# Install tmux, Mosh and the Tailscale daemon
-brew_install tmux mosh tailscale
+# Install tmux, Mosh, the Tailscale daemon and Git LFS
+brew_install tmux mosh tailscale git-lfs
+
+# Git LFS's filters in ~/.gitconfig, set again each run since setup.sh replaces it
+git lfs install > /dev/null
 
 # Install applications
 install_app blender Blender
@@ -236,6 +239,8 @@ as_agent test -x /Users/agent/.local/bin/claude || as_agent bash -c 'cd ~ && cur
 for file in .zshrc .vimrc .gitconfig .gitignore; do
   sudo install -o agent -g staff -m 644 "$file" /Users/agent/
 done
+# Git LFS's filters, set again each run since the line above replaces ~/.gitconfig
+as_agent zsh -lc 'git lfs install' > /dev/null
 [ -d /Users/agent/.zsh/zsh-shift-select ] || as_agent bash -c 'cd ~ && git clone --depth 1 https://github.com/jirutka/zsh-shift-select.git ~/.zsh/zsh-shift-select'
 
 # For login shells, launchd's included: Homebrew on the path, and Vite answering on the tailnet address
@@ -276,9 +281,49 @@ if [[ -n "$SSH_CONNECTION" && -z "$TMUX" && "$TERM_PROGRAM" != "vscode" && $- ==
 fi
 EOF
 
+# Ctrl-n runs it before Claude, so a chat in a folder of ~/Code starts without the trust question
+as_agent tee /Users/agent/trust-folder.py > /dev/null <<'EOF'
+# Marks the current folder as trusted in ~/.claude.json, if it's in ~/Code, so Claude starts there without asking.
+# It holds Claude Code's own lock on the file while writing, and leaves the file alone if it can't get it.
+import json, os, sys, time
+
+config_path = os.path.expanduser('~/.claude.json')
+lock = config_path + '.lock'
+code = os.path.realpath(os.path.expanduser('~/Code'))
+folder = os.path.realpath(os.getcwd())
+
+if (folder != code and not folder.startswith(code + os.sep)) or not os.path.exists(config_path):
+    sys.exit()
+
+for _ in range(30):
+    try:
+        os.mkdir(lock)
+        break
+    except FileExistsError:
+        time.sleep(0.1)
+else:
+    sys.exit()
+
+try:
+    with open(config_path) as f:
+        config = json.load(f)
+    project = config.setdefault('projects', {}).setdefault(folder, {})
+    if project.get('hasTrustDialogAccepted') is not True:
+        project['hasTrustDialogAccepted'] = True
+        temp = f'{config_path}.{os.getpid()}.tmp'
+        with open(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        os.replace(temp, config_path)
+finally:
+    os.rmdir(lock)
+EOF
+
 as_agent tee /Users/agent/.tmux.conf > /dev/null <<'EOF'
 set -g mouse on
 set -g history-limit 100000
+
+# Programs in a window, like Claude, can set the clipboard of every terminal showing it
+set -s set-clipboard on
 
 # A window opened without a name, like a new shell, is named after its folder as the prompt shows it, like ~ or
 # ~/Code, and follows cd; one opened with a name, like a chat or a dev server, keeps it
@@ -319,10 +364,10 @@ set -g status-format[2] "$BLANK"
 
 # The keys used most are Ctrl and a letter, without Ctrl-b, so the programs in the windows never get them
 
-# Ctrl-n: a new Claude chat in a window of its own, asking for a folder in ~/Code and a name
+# Ctrl-n: a new Claude chat in a window of its own, asking for a folder in ~/Code and a name; the folder is trusted
 bind-key -N "New Claude chat in its own window" -n C-n command-prompt -p "repo in ~/Code:,chat name:" {
   if-shell "test -n '%2' && test -d ~/Code/'%1'" {
-    new-window -S -n "%2" -c "~/Code/%1" "~/.local/bin/claude -n '%2'"
+    new-window -S -n "%2" -c "~/Code/%1" "python3 -I ~/trust-folder.py; exec ~/.local/bin/claude -n '%2'"
   } {
     display-message -d 5000 "No chat opened: it needs a name and a folder in ~/Code"
   }
@@ -333,6 +378,10 @@ bind-key -N "New shell" -n C-t new-window
 
 # Ctrl-w: close this window, like Ctrl-b & without the question
 bind-key -N "Close this window" -n C-w kill-window
+
+# Ctrl-Option-Left and Right: the previous and next tab
+bind-key -N "Previous tab" -n C-M-Left previous-window
+bind-key -N "Next tab" -n C-M-Right next-window
 
 # Ctrl-b w, n and p: nothing, instead of tmux's window list and next and previous window
 unbind-key w

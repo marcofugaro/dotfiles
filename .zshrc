@@ -7,6 +7,11 @@ alias gti='git'
 # open a file or URL in Chrome
 alias chrome='open -a "Google Chrome"'
 
+# SSH to the mini in the shell's place, so closing the tab doesn't ask to stop ssh; the tab closes on disconnect
+mini() {
+  exec ssh mini "$@"
+}
+
 # update everything
 alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm update -g; git -C ~/.zsh/zsh-shift-select pull'
 
@@ -110,6 +115,9 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # emacs keybindings, which shift-select builds on
 bindkey -e
+
+# Words stop at punctuation like / . -, as in macOS: ⌥⌫ in ~/Code/dotfiles deletes just dotfiles
+WORDCHARS='_'
 
 # Up/Down search the history for commands starting with the typed text
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search

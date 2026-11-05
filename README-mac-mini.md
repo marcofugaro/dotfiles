@@ -428,9 +428,12 @@ chats keep running when you disconnect. Background chats, further down, and chat
   yourself: `zsh -l ~/mini-up.sh`.
 - Lines in `~/.zshrc` that open a view of `main`, on the main chat, at every SSH login, like levelsio. VS Code's
   terminals skip it: type `chats` there. A view goes away when its device leaves; the windows stay.
-- `~/.tmux.conf`: the mouse on, a long scrollback, window names that stay as given, a red tab with a `!` instead of
+- `~/.tmux.conf`: the mouse on, a long scrollback, Claude's copies reaching your device's clipboard, window names
+  that stay as given, a red tab with a `!` instead of
   a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, `agent@mini: <window>` as the
   terminal's tab title, and the keys below. Re-running the script reloads it.
+- `~/trust-folder.py`, which `Ctrl-n` runs before Claude to mark the chat's folder in `~/Code` as trusted in
+  `~/.claude.json`, holding Claude Code's own lock on that file.
 - `~/.zshenv`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It also makes a Mosh server
   quit a day after its device went away, which closes that view.
 
@@ -443,7 +446,8 @@ Check the boot job once with a power cut: switch the smart plug off and on, or r
    run `zsh -l ~/mini-up.sh` yourself over SSH (it works from the phone too).
 
 **Connect**
-- **MacBook:** in Tabby, `ssh mini`.
+- **MacBook:** in Tabby, `mini`, which runs `ssh mini` in the shell's place: closing the tab doesn't ask to stop
+  ssh, and the tab closes when you disconnect.
 - **Phone:** with Tailscale on, tap the host `mini` in Termius, and leave its Startup Command empty: the mini opens
   the view itself. In Android's settings for Termius, turn off battery optimization, or Android may drop the
   connection when you switch apps. On a shaky connection, turn on **Use Mosh** in the host's settings: the session can
@@ -471,6 +475,7 @@ tapping a tab opens its window. On the phone, `<` or `>` at its edges means more
 | `Ctrl-t` | A new shell, in `~/Code` |
 | `Ctrl-w` | Close this window, after a `y`: whatever runs in it stops |
 | `Ctrl-f` | Fit the window to this device again |
+| `⌃⌥←` / `⌃⌥→` | The previous / next tab, from the MacBook |
 | `Ctrl-b ,` | Rename this window |
 | `Ctrl-b [` | Scroll back in a shell or a dev server's window; `q` stops |
 | `Ctrl-b d` | Leave tmux for a shell on the mini: `exit` disconnects, `chats` goes back |
@@ -490,7 +495,8 @@ starts a new main chat within 5 minutes.
 new window opens with Claude in that folder, ready for your first prompt, and the other device sees its tab.
 - Name it after the task, like `fix-login`, not after the repo: a taken name, like a dev server's window or `claude`,
   opens that window instead. A folder that isn't in `~/Code`, or no name, opens nothing.
-- The first chat in a folder may ask whether to trust it: answer yes.
+- Ctrl-n marks the folder as trusted before Claude starts, so no chat asks whether to trust it. This also applies
+  any hooks or MCP servers in a cloned repo's `.claude/` without asking, so read those first.
 - A chat edits the repo's own files, so its dev server shows the changes. For parallel tasks on one repo, your rules
   have Claude use a worktree, which the dev server doesn't serve.
 - `/exit` ends a chat and closes its window; its conversation stays. To continue it, `Ctrl-n` with the same folder
