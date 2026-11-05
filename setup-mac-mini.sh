@@ -398,12 +398,12 @@ EOF
 # A running tmux reads its config only when it starts
 as_agent zsh -lc 'tmux source-file ~/.tmux.conf' &> /dev/null
 
-# Starts Claude and the dev servers in tmux unless they're running, launchd runs it at boot and every 5 minutes
+# Starts Claude and the listed dev servers in tmux unless they're running, launchd runs it at boot and every 3 minutes
 as_agent mkdir -p /Users/agent/Code
 as_agent tee /Users/agent/mini-up.sh > /dev/null <<'EOF'
 #!/bin/zsh -l
-# Starts the main chat in tmux, and each repo's dev server in a window named after it, unless running.
-# launchd runs it at boot and every 5 minutes; you can also run it yourself: zsh -l ~/mini-up.sh
+# Starts the main chat in tmux, and each listed repo's dev server in a window named after it, unless running.
+# launchd runs it at boot and every 3 minutes; you can also run it yourself: zsh -l ~/mini-up.sh
 cd ~/Code || exit 1
 
 # After a power cut the router can take minutes to come back, and Claude needs the internet
@@ -426,7 +426,10 @@ start() {
 }
 
 start claude ~/Code "$HOME/.local/bin/claude -n main"
+# Repos whose dev server is kept running
+serve=(vibecoding-playground)
 for dir in ~/Code/*(/N); do
+  (( ${serve[(Ie)${dir:t}]} )) || continue
   if grep -q '"dev":' "$dir/package.json" 2>/dev/null; then
     start "${dir:t}" "$dir" "npm run dev"
   fi
@@ -486,7 +489,7 @@ EOF
 sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
 sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 
-# Run mini-up.sh as agent at every boot and every 5 minutes, so what stops comes back
+# Run mini-up.sh as agent at every boot and every 3 minutes, so what stops comes back
 sudo tee /Library/LaunchDaemons/local.mini-up.plist > /dev/null <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -514,7 +517,7 @@ sudo tee /Library/LaunchDaemons/local.mini-up.plist > /dev/null <<'EOF'
   <key>RunAtLoad</key>
   <true/>
   <key>StartInterval</key>
-  <integer>300</integer>
+  <integer>180</integer>
   <key>AbandonProcessGroup</key>
   <true/>
   <key>StandardOutPath</key>

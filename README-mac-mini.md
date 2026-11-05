@@ -422,9 +422,10 @@ chats keep running when you disconnect. Background chats, further down, and chat
 
 **Script:** for `agent`, `setup-mac-mini.sh` sets up:
 - `~/mini-up.sh`, which waits for the internet, then starts the main chat in the window `claude`, in `~/Code`, and
-  each repo's dev server in a window named after the repo, skipping what's already running. A launchd job runs it as
-  `agent` at every boot, before anyone logs in, and every 5 minutes after, so the main chat or a dev server that stops
-  comes back. To stop a dev server for good, close its window and move its repo out of `~/Code`. You can also run it
+  the dev server of each repo in its `serve=(...)` list in a window named after the repo, skipping what's already
+  running. A launchd job runs it as `agent` at every boot, before anyone logs in, and every 3 minutes after, so the
+  main chat or a listed dev server that stops comes back. To stop a dev server for good, take its repo off the list in
+  `setup-mac-mini.sh` and close its window. You can also run it
   yourself: `zsh -l ~/mini-up.sh`.
 - Lines in `~/.zshrc` that open a view of `main`, on the main chat, at every SSH login, like levelsio. VS Code's
   terminals skip it: type `chats` there. A view goes away when its device leaves; the windows stay.

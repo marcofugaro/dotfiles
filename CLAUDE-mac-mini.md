@@ -10,9 +10,12 @@ in another city.
   needs an admin (Homebrew installs and upgrades, the firewall, launchd, Tailscale, SSH), give me the exact command to
   run from my admin account instead of trying a workaround.
 - tmux session `main` holds the main chat (window `claude`), the other chats, and one window per dev server, named
-  after its repo. launchd starts the main chat and the dev servers at boot with `~/mini-up.sh`, and every 5 minutes
-  restarts any that stopped, so restart a dev server in its own window (`tmux respawn-window -k -t main:<repo>`) rather
-  than starting another.
+  after its repo. launchd runs `~/mini-up.sh` at boot and every 3 minutes: it starts the main chat and the dev servers
+  of the repos in its `serve=(...)` list, and restarts any that stopped. Add a repo to that list only when I ask;
+  otherwise start its server once, in a window named after the repo:
+  `tmux new-window -d -t '=main:' -n <repo> -c ~/Code/<repo> 'npm run dev'`. Restart a dev server in its own window
+  (`tmux respawn-window -k -t main:<repo>`) rather than starting another, and take a listed repo off the list before
+  stopping its server, or launchd starts it again.
 
 ## Talking to me
 

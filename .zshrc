@@ -11,6 +11,9 @@ alias chrome='open -a "Google Chrome"'
 mini() {
   exec ssh mini "$@"
 }
+mini-admin() {
+  exec ssh mini-admin "$@"
+}
 
 # update everything
 alias update='sudo softwareupdate -i -a; brew update; brew upgrade; brew cleanup; npm update -g; git -C ~/.zsh/zsh-shift-select pull'
