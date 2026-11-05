@@ -92,10 +92,14 @@ Host mini mini-admin
   UseKeychain yes
 EOF
 
-# Send the key to both users on the mini, while it still takes passwords; ssh-copy-id skips it where it's there
+# Send the key to each user on the mini that doesn't take it yet, while the mini still takes passwords
+send_key() {
+  ssh -o BatchMode=yes -o ConnectTimeout=5 "$1" true &> /dev/null && return
+  ask "Sending the mini's SSH key: please enter $2 password on the mini when ssh-copy-id asks"
+  ssh-copy-id -i ~/.ssh/id_ed25519_mini.pub "$1"
+}
 if nc -z -G 5 mini 22 &> /dev/null; then
-  ask "Sending the mini's SSH key: please enter your password on the mini when ssh-copy-id asks, then agent's"
-  ssh-copy-id -i ~/.ssh/id_ed25519_mini.pub mini-admin && ssh-copy-id -i ~/.ssh/id_ed25519_mini.pub mini
+  send_key mini-admin "your" && send_key mini "agent's"
 else
   warn "The mini isn't reachable yet: please run ./setup-macbook.sh again once setup-mac-mini.sh asks for SSH keys"
 fi
