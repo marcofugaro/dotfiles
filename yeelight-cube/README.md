@@ -127,8 +127,11 @@ Add this `hooks` block to `~/.claude/settings.json`, next to the settings from t
   "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh working" }] }],
   "PreToolUse": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh working" }] }],
   "PostToolUse": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh working" }] }],
+  "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh working" }] }],
   "PermissionRequest": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh input" }] }],
   "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh input" }] }],
+  "SubagentStart": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh working" }] }],
+  "SubagentStop": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh off" }] }],
   "Stop": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh idle" }] }],
   "SessionEnd": [{ "hooks": [{ "type": "command", "command": "bash ~/.claude/yeelight-cube/lamp-hook.sh off" }] }]
 }
@@ -170,7 +173,17 @@ every cube in a stack shows the same animation.
   next frame. A powered-off cube stopped answering for minutes when woken, until it restarted.
 - **Interrupting Claude** (`Esc`) fires no hook, so `cube.mjs` checks each busy session's transcript once a second
   and sets the session idle when it ends with the interrupt.
-- **Sessions that vanish** without ending (a crash, a closed terminal) stop counting after 2 hours without events.
+- **Accepting a permission prompt** fires no hook either, and the command can run for minutes, so `cube.mjs` sets the
+  session working once a Bash command starts under its Claude process. While the session has subagents running, whose
+  commands run in that process too, it waits for the command to finish instead.
+- **Subagents** carry their parent's session, so each one counts as working on its own from `SubagentStart` to
+  `SubagentStop`: a background agent still running after the chat's turn ends keeps the cube working, and its last
+  tool call can't leave the session stuck on working. A permission prompt's notification, 6 seconds after it, doesn't
+  say which subagent asked, so it only counts for a prompt that fired no `PermissionRequest`.
+- **Sessions that end without saying so** (a fork or resume into a new session, a crash, a closed terminal) stop
+  counting within a second: each session's file records its Claude process, and `cube.mjs` drops the session once that
+  process exits or moves on to another session. Any session left over still stops counting after 2 hours without
+  events.
 - **If the cube is offline,** Claude isn't slowed down: the hook only writes a file. `cube.mjs` retries every
   10 seconds.
 - **One machine drives the cube.** Each machine keeps its own session list, so set this up on the mini only.
@@ -186,6 +199,10 @@ All of this ran against a stand-in cube that speaks the same protocol:
   color change in `cube.json` showed up within a second.
 - **Hook:** a replay of two overlapping sessions (prompts, tool calls, a question, a permission prompt, finishing,
   ending) gave the right status after all 12 events.
+- **Permission prompts,** in a live Claude Code 2.1.319 session: accepting a prompt fires no hook until the tool's
+  `PostToolUse`, or `PostToolUseFailure` if it fails, and the prompt's notification comes 6 seconds later without the
+  subagent's id. With `cube.mjs` watching, accepting a 15-second command showed working within 0.2 seconds, a prompt
+  left waiting stayed on "needs you", and a background subagent's accepted prompt went back to working.
 
 Not yet tried on a real cube:
 - The protocol comes from YeelightMatrix, which was written for the Cube Matrix; the Panel is its `5x5_blur` type.

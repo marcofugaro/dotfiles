@@ -144,8 +144,11 @@ lamp_hooks = {
     'UserPromptSubmit': hook('working'),
     'PreToolUse': hook('working', '*'),
     'PostToolUse': hook('working', '*'),
+    'PostToolUseFailure': hook('working', '*'),
     'PermissionRequest': hook('input', '*'),
     'Notification': hook('input', 'permission_prompt|elicitation_dialog'),
+    'SubagentStart': hook('working'),
+    'SubagentStop': hook('off'),
     'Stop': hook('idle'),
     'SessionEnd': hook('off'),
 }

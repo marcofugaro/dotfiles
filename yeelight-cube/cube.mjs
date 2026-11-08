@@ -281,24 +281,83 @@ const isInterrupt = (entry) =>
   Array.isArray(entry.message?.content) &&
   entry.message.content.some((part) => part.type === 'text' && part.text?.startsWith('[Request interrupted by user'))
 
-// An interrupt fires no hook, so a busy session whose transcript ends with one since its last hook goes idle
-const checkInterrupts = () => {
-  for (const session of readdirSync(DIR)) {
-    if (session.startsWith('.') || session.endsWith('.log')) continue
+const isRunning = (pid) => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+const runHook = (state, input) => spawnSync('/bin/bash', [HOOK, state], { input: JSON.stringify(input) })
+
+// When the Bash tool's commands running under each of the given Claude processes started, in ms. Claude runs each
+// command in a shell that sources one of its shell snapshots.
+const bashStarts = (pids) => {
+  const starts = new Map(pids.map((pid) => [pid, []]))
+  const { stdout } = spawnSync('/bin/ps', ['-A', '-ww', '-o', 'ppid=,etime=,command='], { encoding: 'utf8' })
+  const now = Date.now()
+  for (const line of stdout?.split('\n') ?? []) {
+    const [, ppid, elapsed, command] = line.match(/^\s*(\d+)\s+(\S+)\s+(.*)$/) ?? []
+    if (!starts.has(Number(ppid)) || !command.includes('/shell-snapshots/')) continue
+    // [[dd-]hh:]mm:ss
+    const [days, clock] = elapsed.includes('-') ? elapsed.split('-') : [0, elapsed]
+    const seconds = clock.split(':').reduce((total, part) => total * 60 + Number(part), Number(days) * 24)
+    starts.get(Number(ppid)).push(now - seconds * 1000)
+  }
+  return starts
+}
+
+// A session ends without SessionEnd when its process exits or moves on to another session (a fork, a resume, a
+// crash), so it's dropped then. An interrupt fires no hook, so a busy session whose transcript ends with one since its
+// last hook goes idle. Accepting a permission prompt fires no hook either, and the command can run for minutes, so a
+// session waiting on one goes back to working once a Bash command starts under its process. Its subagents' commands
+// run there too, so not while it has any.
+const checkSessions = () => {
+  const names = readdirSync(DIR)
+  const parents = new Set(names.filter((name) => name.includes('.')).map((name) => name.split('.')[0]))
+  const sessions = []
+  // Sessions only: not .state, the log or a subagent's <session>.<agent id>
+  for (const session of names) {
+    if (session.includes('.')) continue
     const file = join(DIR, session)
-    const [status, transcript] = read(file).split('\n')
     const since = statSync(file, { throwIfNoEntry: false })?.mtimeMs
-    if ((status !== 'working' && status !== 'input') || !transcript || !since) continue
-    if (!isInterrupt(lastMessage(transcript, since))) continue
-    log(`session ${session} interrupted`)
-    spawnSync('/bin/bash', [HOOK, 'idle'], { input: JSON.stringify({ session_id: session }) })
+    if (!since) continue
+    const [status, pid, transcript] = read(file).split('\n')
+    sessions.push({ session, since, status, pid: Number(pid) || 0, transcript, stale: pid?.startsWith('/') })
+  }
+  const newest = new Map()
+  for (const s of sessions) if (s.pid && !(newest.get(s.pid)?.since > s.since)) newest.set(s.pid, s)
+  const prompts = []
+  for (const s of sessions) {
+    if (s.stale || (s.pid && (!isRunning(s.pid) || newest.get(s.pid) !== s))) {
+      log(`session ${s.session} gone`)
+      runHook('off', { session_id: s.session })
+      continue
+    }
+    if (s.status !== 'working' && s.status !== 'input') continue
+    if (s.transcript && isInterrupt(lastMessage(s.transcript, s.since))) {
+      log(`session ${s.session} interrupted`)
+      runHook('idle', { session_id: s.session, hook_event_name: 'Interrupt' })
+    } else if (s.status === 'input' && s.pid && !parents.has(s.session)) {
+      prompts.push(s)
+    }
+  }
+  if (!prompts.length) return
+  const starts = bashStarts(prompts.map((s) => s.pid))
+  for (const s of prompts) {
+    // ps gives each start to the second, so one in the second before the prompt doesn't count
+    if (!starts.get(s.pid).some((start) => start - 1000 > s.since)) continue
+    log(`session ${s.session} accepted`)
+    runHook('working', { session_id: s.session, hook_event_name: 'Accept' })
   }
 }
 
 setInterval(() => {
   try {
-    checkInterrupts()
+    checkSessions()
   } catch (error) {
-    log(`interrupts: ${error.stack}`)
+    log(`sessions: ${error.stack}`)
   }
 }, 1000)

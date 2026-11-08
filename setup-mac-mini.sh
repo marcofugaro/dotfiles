@@ -249,14 +249,14 @@ eval "\$(/opt/homebrew/bin/brew shellenv)"
 export __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS='$mini_host'
 EOF
 
-# For every other shell too, like the one SSH runs a command in, which is how Mosh starts its server
-as_agent tee /Users/agent/.zshenv > /dev/null <<'EOF'
-typeset -U PATH path
+# For every other shell too, like the one SSH runs a command in, which is how Mosh starts its server; for both users
+zshenv='typeset -U PATH path
 path=(/opt/homebrew/bin $path)
 
-# a Mosh server whose device went away quits after a day, which closes its tmux view
-export MOSH_SERVER_NETWORK_TMOUT=86400
-EOF
+# a Mosh server whose device went away quits after a day, ending its session
+export MOSH_SERVER_NETWORK_TMOUT=86400'
+as_agent tee /Users/agent/.zshenv > /dev/null <<< "$zshenv"
+echo "$zshenv" > ~/.zshenv
 
 # On every SSH login, a view of the tmux session of its own: devices share the windows, each picks its own
 as_agent tee -a /Users/agent/.zshrc > /dev/null <<'EOF'

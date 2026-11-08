@@ -435,8 +435,8 @@ chats keep running when you disconnect. Background chats, further down, and chat
   terminal's tab title, and the keys below. Re-running the script reloads it.
 - `~/trust-folder.py`, which `Ctrl-n` runs before Claude to mark the chat's folder in `~/Code` as trusted in
   `~/.claude.json`, holding Claude Code's own lock on that file.
-- `~/.zshenv`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It also makes a Mosh server
-  quit a day after its device went away, which closes that view.
+- `~/.zshenv`, for `agent` and `<you>`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It
+  also makes a Mosh server quit a day after its device went away, which closes that view.
 
 Check the boot job once with a power cut: switch the smart plug off and on, or run `sudo reboot`.
 1. About a minute later the main chat should appear in the Claude app, and `ssh mini` should land in it.
@@ -447,8 +447,10 @@ Check the boot job once with a power cut: switch the smart plug off and on, or r
    run `zsh -l ~/mini-up.sh` yourself over SSH (it works from the phone too).
 
 **Connect**
-- **MacBook:** in Tabby, `mini`, which runs `ssh mini` in the shell's place: closing the tab doesn't ask to stop
-  ssh, and the tab closes when you disconnect.
+- **MacBook:** in Tabby, `mini`, which runs `mosh mini` in the shell's place: the view rides out sleep and network
+  changes, with a `Last contact` banner until it's back, and closing the tab doesn't ask to stop it. The tab closes
+  when the session ends; if the mini never answers, `Ctrl-^ .` gives up. `ssh mini` still works, without the
+  reconnecting.
 - **Phone:** with Tailscale on, tap the host `mini` in Termius, and leave its Startup Command empty: the mini opens
   the view itself. In Android's settings for Termius, turn off battery optimization, or Android may drop the
   connection when you switch apps. On a shaky connection, turn on **Use Mosh** in the host's settings: the session can
@@ -585,8 +587,8 @@ tailnet address, where only your devices can reach it. Open a repo's dev server 
   Mosh for `mini` if your connection is flaky.
 - **Chrome:** for the dev servers' addresses.
 
-**Script:** Mosh's server is let through the mini's firewall, and Homebrew is on `agent`'s path for commands run over
-SSH, where Mosh looks for it.
+**Script:** Mosh's server is let through the mini's firewall, and Homebrew is on both users' path for commands run
+over SSH, where Mosh looks for it.
 
 ### 13. Accounts
 
@@ -598,7 +600,7 @@ SSH, where Mosh looks for it.
 
 ### 14. Maintenance
 
-- **Weekly updates:** as `<you>` (`ssh mini-admin`), in the dotfiles folder and inside a tmux of your own
+- **Weekly updates:** as `<you>` (`mini-admin`), in the dotfiles folder and inside a tmux of your own
   (`tmux new -A -s admin`), run `./setup-mac-mini.sh --update`. It runs `brew update && brew upgrade`, then lets the new
   Mosh (and the lamp's Node) through the firewall again and reinstalls
   the Tailscale daemon, which Homebrew doesn't update. Restarting Tailscale can drop SSH sessions over it for a moment.
@@ -635,8 +637,9 @@ through reboots with nobody logged in, and Claude can change the colors and anim
 - [ ] `agent` logged in to GitHub; repos cloned, each with its own port; GPU tests pass over SSH
 - [ ] Claude Code logged in as `agent` with claude.ai; memory copied
 - [ ] The main chat comes back after a restart, and GPU tests pass in a shell window (`Ctrl-t`) there
-- [ ] `ssh mini` and Termius `mini` both land in the main chat; each device switches chats on its own; a chat opened
-  with `Ctrl-n` on one shows up on the other, with a `!` while it waits on a permission prompt
+- [ ] `mini` and Termius `mini` both land in the main chat, and `mini` on the MacBook comes back after sleep; each
+  device switches chats on its own; a chat opened with `Ctrl-n` on one shows up on the other, with a `!` while it
+  waits on a permission prompt
 - [ ] VS Code Remote-SSH works; the dev servers open at `https://mini.<tailnet>.ts.net:<port>` on the phone
 - [ ] Tried everything from outside the home network: SSH, VS Code, the Claude app
 - [ ] Security key on the claude.ai sign-in account; trusted devices on

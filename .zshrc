@@ -7,12 +7,13 @@ alias gti='git'
 # open a file or URL in Chrome
 alias chrome='open -a "Google Chrome"'
 
-# SSH to the mini in the shell's place, so closing the tab doesn't ask to stop ssh; the tab closes on disconnect
+# Mosh to the mini in the shell's place: it rides out sleep and network changes, and closing the tab doesn't ask to
+# stop it. The tab closes when the session ends; Ctrl-^ . gives up on a mini that doesn't answer
 mini() {
-  exec ssh mini "$@"
+  MOSH_TITLE_NOPREFIX=1 exec mosh mini "$@"
 }
 mini-admin() {
-  exec ssh mini-admin "$@"
+  MOSH_TITLE_NOPREFIX=1 exec mosh mini-admin "$@"
 }
 
 # update everything
