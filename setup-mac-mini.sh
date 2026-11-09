@@ -57,6 +57,57 @@ install_tailscaled() {
   sudo tailscaled install-system-daemon
 }
 
+# Run a command as agent, from / since it can't enter the private admin home
+as_agent() {
+  (cd / && sudo -H -u agent "$@")
+}
+
+# Blender Lab's MCP server for agent's Claude, with its add-on in agent's Blender, which runs in the background
+# since the mini has no screen. Each Blender version keeps its own add-ons, so --update installs it again
+blender_mcp_version=1.0.3
+agent_blender=/Users/agent/.local/share/blender/Blender.app
+install_blender_mcp() {
+  # Homebrew's Blender waits on a first-launch Gatekeeper prompt that nobody can click, and macOS keeps scripts from
+  # clearing it on apps in /Applications. So agent runs an APFS clone, which takes no space, with the flag cleared
+  # before its first launch, after which macOS locks it too; a new clone comes with each Blender version
+  local version dir
+  version="$(plutil -extract CFBundleShortVersionString raw /Applications/Blender.app/Contents/Info.plist)"
+  if [ "$(as_agent plutil -extract CFBundleShortVersionString raw "$agent_blender/Contents/Info.plist" 2> /dev/null)" != "$version" ] ||
+    as_agent xattr -p com.apple.quarantine "$agent_blender" &> /dev/null; then
+    as_agent rm -rf "$agent_blender"
+    as_agent mkdir -p "${agent_blender%/*}"
+    as_agent /bin/cp -cR /Applications/Blender.app "$agent_blender" &&
+      as_agent xattr -dr com.apple.quarantine "$agent_blender"
+  fi
+  if ! as_agent test -x "$agent_blender/Contents/MacOS/Blender" ||
+    as_agent xattr -p com.apple.quarantine "$agent_blender" &> /dev/null; then
+    warn "Blender MCP skipped: agent's copy of Blender couldn't be made"
+    return
+  fi
+  # Its command, a script since Blender finds its files from the path it's started at
+  as_agent tee /Users/agent/.local/bin/blender > /dev/null <<EOF
+#!/bin/sh
+exec "$agent_blender/Contents/MacOS/Blender" "\$@"
+EOF
+  as_agent chmod 755 /Users/agent/.local/bin/blender
+
+  dir="$(mktemp -d /tmp/blender-mcp.XXXXXX)"
+  chmod 755 "$dir"
+  curl -fsSL -o "$dir/mcp.zip" \
+    "https://projects.blender.org/lab/blender_mcp/releases/download/v$blender_mcp_version/mcp-$blender_mcp_version.zip" &&
+    chmod 644 "$dir/mcp.zip" &&
+    as_agent /Users/agent/.local/bin/blender --command extension install-file -r user_default --enable "$dir/mcp.zip" \
+      > /dev/null &&
+    as_agent zsh -lc "uv tool install --managed-python --quiet \
+      'git+https://projects.blender.org/lab/blender_mcp.git@v$blender_mcp_version#subdirectory=mcp'" &&
+    as_agent zsh -lc "~/.local/bin/claude mcp remove blender -s user &> /dev/null
+      ~/.local/bin/claude mcp add blender -s user -e BLENDER_PATH=$agent_blender/Contents/MacOS/Blender \
+        -- ~/.local/bin/blender-mcp" > /dev/null &&
+    ok "Blender MCP $blender_mcp_version is ready for agent's Claude, from its next chat" ||
+    warn "Blender MCP failed, see above: please run this script again"
+  rm -rf "$dir"
+}
+
 # Update, then re-allow Mosh and reinstall the Tailscale daemon, which brew upgrade leaves on the old version
 # Restarting Tailscale can drop SSH sessions over it for a moment, so run it in tmux
 if [[ "$1" == "--update" ]]; then
@@ -65,14 +116,11 @@ if [[ "$1" == "--update" ]]; then
   section "Mosh and Tailscale"
   allow_mosh
   install_tailscaled
+  section "Blender MCP"
+  install_blender_mcp
   [ -e /Library/LaunchDaemons/local.claude-cube.plist ] && ./setup-mac-mini-status-lamp.sh --update
   exit
 fi
-
-# Run a command as agent, from / since it can't enter the private admin home
-as_agent() {
-  (cd / && sudo -H -u agent "$@")
-}
 
 # The mini's MagicDNS name, like mini.<tailnet>.ts.net
 tailnet_host() {
@@ -168,8 +216,8 @@ killall Dock
 
 section "Packages and apps"
 
-# Install tmux, Mosh, the Tailscale daemon and Git LFS
-brew_install tmux mosh tailscale git-lfs
+# Install tmux, Mosh, the Tailscale daemon, Git LFS, and uv for the Blender MCP server
+brew_install tmux mosh tailscale git-lfs uv
 
 # Git LFS's filters in ~/.gitconfig, set again each run since setup.sh replaces it
 git lfs install > /dev/null
@@ -210,6 +258,26 @@ section "Claude Code instructions"
 mini_host="$(tailnet_host)"
 claude_md="$(cat CLAUDE.md; echo; sed "s/mini\.<tailnet>\.ts\.net/$mini_host/" CLAUDE-mac-mini.md)"
 printf "%s\n" "$claude_md" > ~/.claude/CLAUDE.md
+
+
+section "Your tmux"
+
+# The session admin, which `mini-admin` lands in: the mouse scrolls its scrollback, which Mosh doesn't keep, and what
+# runs there carries on when the connection drops
+cat > ~/.tmux.conf <<'EOF'
+set -g mouse on
+set -g history-limit 100000
+
+# Programs in a window can set the clipboard of every terminal showing it
+set -s set-clipboard on
+
+# The terminal's tab title is the one the shell sets, like marcofugaro@mini:~/Code/dotfiles
+set -g set-titles on
+set -g set-titles-string '#T'
+EOF
+
+# A running tmux reads its config only when it starts
+tmux source-file ~/.tmux.conf &> /dev/null
 
 
 ###############################################################################
@@ -467,6 +535,11 @@ with open(path, 'w') as f:
     f.write('\n')
 PY
 printf "%s\n" "$claude_md" | as_agent tee /Users/agent/.claude/CLAUDE.md > /dev/null
+
+
+section "Blender MCP"
+
+install_blender_mcp
 
 
 ###############################################################################

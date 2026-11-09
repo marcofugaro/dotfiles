@@ -432,7 +432,8 @@ chats keep running when you disconnect. Background chats, further down, and chat
 - `~/.tmux.conf`: the mouse on, a long scrollback, Claude's copies reaching your device's clipboard, window names
   that stay as given, a red tab with a `!` instead of
   a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, `agent@mini: <window>` as the
-  terminal's tab title, and the keys below. Re-running the script reloads it.
+  terminal's tab title, and the keys below. Re-running the script reloads it. `<you>` gets a smaller one: the mouse
+  on, a long scrollback, the clipboard, and the shell's tab title.
 - `~/trust-folder.py`, which `Ctrl-n` runs before Claude to mark the chat's folder in `~/Code` as trusted in
   `~/.claude.json`, holding Claude Code's own lock on that file.
 - `~/.zshenv`, for `agent` and `<you>`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It
@@ -450,7 +451,8 @@ Check the boot job once with a power cut: switch the smart plug off and on, or r
 - **MacBook:** in Tabby, `mini`, which runs `mosh mini` in the shell's place: the view rides out sleep and network
   changes, with a `Last contact` banner until it's back, and closing the tab doesn't ask to stop it. The tab closes
   when the session ends; if the mini never answers, `Ctrl-^ .` gives up. `ssh mini` still works, without the
-  reconnecting.
+  reconnecting. `mini-admin` does the same as `<you>`, landing in your own tmux session `admin`: Mosh keeps no
+  scrollback, so the trackpad scrolls tmux's.
 - **Phone:** with Tailscale on, tap the host `mini` in Termius, and leave its Startup Command empty: the mini opens
   the view itself. In Android's settings for Termius, turn off battery optimization, or Android may drop the
   connection when you switch apps. On a shaky connection, turn on **Use Mosh** in the host's settings: the session can
@@ -600,8 +602,8 @@ over SSH, where Mosh looks for it.
 
 ### 14. Maintenance
 
-- **Weekly updates:** as `<you>` (`mini-admin`), in the dotfiles folder and inside a tmux of your own
-  (`tmux new -A -s admin`), run `./setup-mac-mini.sh --update`. It runs `brew update && brew upgrade`, then lets the new
+- **Weekly updates:** as `<you>` (`mini-admin`, which lands in your own tmux session `admin`), in the dotfiles folder,
+  run `./setup-mac-mini.sh --update`. It runs `brew update && brew upgrade`, then lets the new
   Mosh (and the lamp's Node) through the firewall again and reinstalls
   the Tailscale daemon, which Homebrew doesn't update. Restarting Tailscale can drop SSH sessions over it for a moment.
   Claude Code updates itself (check with `claude doctor` in a shell window of `mini`).

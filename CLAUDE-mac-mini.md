@@ -42,6 +42,16 @@ in another city.
   remotely.
 - There's no display here: any Chrome you start must be headless.
 
+## Blender
+
+- Run Blender as `~/.local/bin/blender`, agent's own copy: the one in `/Applications` waits on a launch prompt that
+  nobody can click.
+- The Blender MCP's `*_for_cli` tools open a `.blend` file in background Blender for each call. The others need a
+  running Blender: start one in the background, in a tmux window named `blender`, and close it when you're done:
+  `tmux new-window -d -t '=main:' -n blender '~/.local/bin/blender -b [file.blend] -c blender_mcp'`. It serves every
+  chat on port 9876, so check for the window first. Tools that need Blender's window, like screenshots, don't work
+  here.
+
 ## Working in parallel
 
 - Run long jobs in tmux or in the background: my connection can drop at any moment, and VS Code's terminals close
