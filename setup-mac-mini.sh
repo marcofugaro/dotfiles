@@ -262,14 +262,27 @@ printf "%s\n" "$claude_md" > ~/.claude/CLAUDE.md
 
 section "Your tmux"
 
+# xterm-mosh, xterm-256color by another name: Mosh's clients run tmux as it, so tmux can draw dim, which Mosh drops,
+# as gray for them alone. Built with tmux's own ncurses, for both users
+tic="$(brew --prefix ncurses)/bin/tic"
+xterm_mosh='xterm-mosh|xterm-256color for tmux under Mosh, use=xterm-256color,'
+"$tic" -x -o ~/.terminfo - <<< "$xterm_mosh"
+
 # The session admin, which `mini-admin` lands in: the mouse scrolls its scrollback, which Mosh doesn't keep, and what
 # runs there carries on when the connection drops
 cat > ~/.tmux.conf <<'EOF'
 set -g mouse on
 set -g history-limit 100000
 
+# No status bar: the screen looks like a plain shell
+set -g status off
+
 # Programs in a window can set the clipboard of every terminal showing it
 set -s set-clipboard on
+
+# Dim as gray for Mosh's clients, the shade Tabby gives dim white text. Without AX, tmux resets before going back to
+# the default color, so dim text right after colored dim text is gray too
+set -s 'terminal-overrides[1]' 'xterm-mosh:dim=\E[38;5;244m:AX@'
 
 # The terminal's tab title is the one the shell sets, like marcofugaro@mini:~/Code/dotfiles
 set -g set-titles on
@@ -326,12 +339,17 @@ export MOSH_SERVER_NETWORK_TMOUT=86400'
 as_agent tee /Users/agent/.zshenv > /dev/null <<< "$zshenv"
 echo "$zshenv" > ~/.zshenv
 
+# xterm-mosh, which `chats` runs tmux as under Mosh
+as_agent "$tic" -x -o /Users/agent/.terminfo - <<< "$xterm_mosh"
+
 # On every SSH login, a view of the tmux session of its own: devices share the windows, each picks its own
 as_agent tee -a /Users/agent/.zshrc > /dev/null <<'EOF'
 
 # open a view of the main tmux session's windows, for this terminal only, on the main chat; it goes away when it
-# detaches
+# detaches. Under Mosh it runs as xterm-mosh, for which tmux draws dim as gray
 chats() {
+  local term=$TERM
+  [[ "$(ps -o comm= -p $PPID)" == *mosh-server ]] && term=xterm-mosh
   if ! tmux has-session -t '=main' 2> /dev/null; then
     if tmux list-sessions -F '#{session_group}' 2> /dev/null | grep -qxF main; then
       # main was closed while a view kept its windows: it takes them back
@@ -340,7 +358,7 @@ chats() {
       tmux new-session -d -s main -n claude -c ~/Code "$HOME/.local/bin/claude -n main"
     fi
   fi
-  tmux new-session -t '=main' -c ~/Code \; set-option destroy-unattached keep-last \; select-window -t '=claude'
+  TERM=$term tmux new-session -t '=main' -c ~/Code \; set-option destroy-unattached keep-last \; select-window -t '=claude'
 }
 
 # on SSH logins, except from VS Code, whose terminals run `chats` by hand
@@ -392,6 +410,10 @@ set -g history-limit 100000
 
 # Programs in a window, like Claude, can set the clipboard of every terminal showing it
 set -s set-clipboard on
+
+# Dim as gray for Mosh's clients, the shade Tabby gives dim white text. Without AX, tmux resets before going back to
+# the default color, so dim text right after colored dim text is gray too
+set -s 'terminal-overrides[1]' 'xterm-mosh:dim=\E[38;5;244m:AX@'
 
 # A window opened without a name, like a new shell, is named after its folder as the prompt shows it, like ~ or
 # ~/Code, and follows cd; one opened with a name, like a chat or a dev server, keeps it

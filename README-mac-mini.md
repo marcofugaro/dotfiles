@@ -433,7 +433,10 @@ chats keep running when you disconnect. Background chats, further down, and chat
   that stay as given, a red tab with a `!` instead of
   a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, `agent@mini: <window>` as the
   terminal's tab title, and the keys below. Re-running the script reloads it. `<you>` gets a smaller one: the mouse
-  on, a long scrollback, the clipboard, and the shell's tab title.
+  on, a long scrollback, no status bar, the clipboard, and the shell's tab title. Both draw dim text in gray for
+  Mosh, which drops dim, like the git branch in the prompt and Claude's suggestions.
+- `~/.terminfo`, for `agent` and `<you>`, with `xterm-mosh`: `xterm-256color` by another name, which tmux runs as
+  under Mosh (`mini`, `mini-admin`, Termius with Mosh), so the gray is for those devices alone.
 - `~/trust-folder.py`, which `Ctrl-n` runs before Claude to mark the chat's folder in `~/Code` as trusted in
   `~/.claude.json`, holding Claude Code's own lock on that file.
 - `~/.zshenv`, for `agent` and `<you>`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It

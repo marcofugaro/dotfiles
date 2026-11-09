@@ -12,9 +12,10 @@ alias chrome='open -a "Google Chrome"'
 mini() {
   MOSH_TITLE_NOPREFIX=1 exec mosh mini "$@"
 }
-# As your account, in its tmux session admin: Mosh keeps no scrollback, so the mouse scrolls tmux's instead
+# As your account, in its tmux session admin: Mosh keeps no scrollback, so the mouse scrolls tmux's instead. tmux runs
+# as xterm-mosh, for which it draws dim, which Mosh drops, as gray
 mini-admin() {
-  MOSH_TITLE_NOPREFIX=1 exec mosh mini-admin -- tmux new -A -s admin
+  MOSH_TITLE_NOPREFIX=1 exec mosh mini-admin -- env TERM=xterm-mosh tmux new -A -s admin
 }
 
 # update everything
