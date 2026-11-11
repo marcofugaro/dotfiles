@@ -10,8 +10,8 @@ source "$(dirname "$0")/utils/print.sh"
 export SUDO_PROMPT="${bold}${yellow}Please enter your admin password, for sudo:${reset} "
 
 # Yeelight Cube status lamp for the Mac mini: run from the admin account, after setup-mac-mini.sh.
-# First put the cube on your Wi-Fi with a fixed address (yeelight-cube/README.md, step 1). Safe to run again: it installs
-# the lamp's files and settings again, keeping the cube's address and cubes.
+# First put the cube on your Wi-Fi (yeelight-cube/README.md, step 1). Safe to run again: it installs the lamp's files and
+# settings again, keeping the cube's address and cubes.
 #   ./setup-mac-mini-status-lamp.sh --update   lets the new Node through the firewall, run by setup-mac-mini.sh --update
 
 lamp_dir=/Users/agent/.claude/yeelight-cube
@@ -77,14 +77,6 @@ done
 sed -e "s/\"ip\": \"[^\"]*\"/\"ip\": \"$cube_ip\"/" -e "s/\"modules\": \[[^]]*]/\"modules\": [$modules]/" \
   yeelight-cube/cube.example.json | as_agent tee "$lamp_dir/cube.json" > /dev/null
 
-# Check the cube answers at the address in its settings
-cube_ip="$(as_agent plutil -extract ip raw -o - "$lamp_dir/cube.json")"
-if nc -z -G 3 "$cube_ip" 55443 &> /dev/null; then
-  ok "The cube answers at $cube_ip"
-else
-  warn "The cube doesn't answer at $cube_ip: please check LAN Control in the Yeelight app, and the address in $lamp_dir/cube.json"
-fi
-
 
 section "Boot job"
 
@@ -121,6 +113,22 @@ sudo chmod 644 /Library/LaunchDaemons/local.claude-cube.plist
 # Reloaded every run, so a changed plist or cube.mjs takes effect
 sudo launchctl bootout system/local.claude-cube 2> /dev/null
 sudo launchctl bootstrap system /Library/LaunchDaemons/local.claude-cube.plist
+
+# Check the cube answers, giving the lamp time to find its new address if it moved
+cube_found=false
+for _ in {1..10}; do
+  cube_ip="$(as_agent plutil -extract ip raw -o - "$lamp_dir/cube.json")"
+  if nc -z -G 1 "$cube_ip" 55443 &> /dev/null; then
+    cube_found=true
+    break
+  fi
+  sleep 1
+done
+if $cube_found; then
+  ok "The cube answers at $cube_ip"
+else
+  warn "The cube doesn't answer at $cube_ip, and the lamp didn't find it on the network: please check it's on the Wi-Fi with LAN Control on in the Yeelight app"
+fi
 
 
 section "Claude Code hooks"

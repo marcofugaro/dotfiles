@@ -627,7 +627,7 @@ over SSH, where Mosh looks for it.
 A Yeelight Cube on your desk can animate what Claude is doing: yellow ripples while it works, a white and orange pulse
 when it needs you, a slow orange breathe when it's done. The mini drives it directly over Wi-Fi, so it keeps working
 through reboots with nobody logged in, and Claude can change the colors and animations. Parts list and how it works:
-[yeelight-cube/README.md](yeelight-cube/README.md). Once the cube is on your Wi-Fi with a fixed address, run
+[yeelight-cube/README.md](yeelight-cube/README.md). Once the cube is on your Wi-Fi, run
 `./setup-mac-mini-status-lamp.sh` as `<you>` in the dotfiles folder to install it.
 
 ### Checklist

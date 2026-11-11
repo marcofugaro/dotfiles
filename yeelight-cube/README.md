@@ -48,7 +48,8 @@ After step 1, `setup-mac-mini-status-lamp.sh` in the dotfiles folder does steps 
 
 1. Set it up with the Yeelight app, on the same Wi-Fi as the mini. If the cube's settings show **LAN Control**, turn
    it on.
-2. Give it a fixed address in your router (a DHCP reservation). The setup suggests `192.168.1.63`.
+2. Find its address in the app's device info: the setup asks for it. It needn't be fixed: when the router gives the
+   cube a new one, `cube.mjs` finds it.
 3. Check the mini can reach it: `nc -z <cube IP> 55443 && echo reachable`.
 
 ### 2. Let music mode through the mini's firewall (as `<you>`)
@@ -186,6 +187,9 @@ every cube in a stack shows the same animation.
   events.
 - **If the cube is offline,** Claude isn't slowed down: the hook only writes a file. `cube.mjs` retries every
   10 seconds.
+- **If the cube's address changes,** `cube.mjs` finds it with Yeelight's discovery, a search on the local network that
+  the cube answers, then saves the new address in `cube.json` and reconnects. It searches each time the cube doesn't
+  answer.
 - **One machine drives the cube.** Each machine keeps its own session list, so set this up on the mini only.
 - **At your other home** the cube isn't in sight; the Claude app's notifications on your phone cover that.
 
@@ -204,7 +208,10 @@ All of this ran against a stand-in cube that speaks the same protocol:
   subagent's id. With `cube.mjs` watching, accepting a 15-second command showed working within 0.2 seconds, a prompt
   left waiting stayed on "needs you", and a background subagent's accepted prompt went back to working.
 
+On the real cube (it reports itself as a `CubeMatrix`, firmware 92): started at its old address, `cube.mjs` timed out
+after 3 seconds, found the cube at its new address, saved it in `cube.json` and connected music mode.
+
 Not yet tried on a real cube:
 - The protocol comes from YeelightMatrix, which was written for the Cube Matrix; the Panel is its `5x5_blur` type.
-- Whether the real cube connects back for music mode and keeps up with 24 frames a second.
+- Whether the real cube keeps up with 24 frames a second.
 - Whether the Yeelight app shows a LAN Control switch for the cube.

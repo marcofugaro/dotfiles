@@ -10,10 +10,22 @@
  * library does: set_power, activate_fx_mode "direct", and update_leds with one base64 RGB triple per LED. Frames go
  * over "music mode", a connection the cube opens back to this process and doesn't rate-limit; without it the cube
  * still shows each status, refreshed every few seconds. Dark is black frames, never set_power off: a cube that's
- * powered off can take minutes to answer again, until it restarts.
+ * powered off can take minutes to answer again, until it restarts. When the cube doesn't answer at its address,
+ * Yeelight's SSDP discovery finds where it is now, and the address is saved in cube.json.
  */
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, closeSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs'
+import { createSocket } from 'node:dgram'
+import {
+  appendFileSync,
+  closeSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { connect, createServer } from 'node:net'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,6 +37,7 @@ const STATE = join(DIR, '.state')
 const TIMEOUT_MS = 3000
 const FADE_MS = 400
 const RETRY_MS = 10000
+const DISCOVER_MS = 2000
 mkdirSync(DIR, { recursive: true })
 
 const log = (message) => appendFileSync(join(DIR, 'cube.log'), `${new Date().toISOString()} ${message}\n`)
@@ -142,6 +155,45 @@ const send = (commands) =>
     })
   })
 
+// The address of the first device on the network that answers Yeelight's discovery and takes per-LED frames, or null
+const SEARCH = 'M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1982\r\nMAN: "ssdp:discover"\r\nST: wifi_bulb\r\n'
+const discover = () =>
+  new Promise((resolve) => {
+    const socket = createSocket('udp4')
+    let finished = false
+    const done = (ip) => {
+      if (finished) return
+      finished = true
+      clearTimeout(timer)
+      socket.close()
+      resolve(ip)
+    }
+    const timer = setTimeout(() => done(null), DISCOVER_MS)
+    socket.on('error', () => done(null))
+    socket.on('message', (message) => {
+      const headers = {}
+      for (const line of message.toString().split('\r\n')) {
+        const colon = line.indexOf(':')
+        if (colon > 0) headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim()
+      }
+      if (!headers.support?.split(' ').includes('update_leds')) return
+      const ip = headers.location?.match(/^yeelight:\/\/([\d.]+):/)?.[1]
+      if (ip) done(ip)
+    })
+    socket.bind(() => socket.send(SEARCH, 1982, '239.255.255.250', (error) => error && done(null)))
+  })
+
+// Follows the cube to its new address, saved in cube.json for the next start
+const moveTo = (ip) => {
+  log(`cube found at ${ip}`)
+  config.ip = ip
+  try {
+    writeFileSync(CONFIG, readFileSync(CONFIG, 'utf8').replace(/"ip":\s*"[^"]*"/, `"ip": "${ip}"`))
+  } catch (error) {
+    log(`cube.json: ${error.message}`)
+  }
+}
+
 // Music mode: the cube connects here and then takes frames without acknowledging them
 const MUSIC_PORT = config.musicPort ?? 54321
 let stream = null
@@ -179,9 +231,14 @@ let fadeAt = 0
 const control = (commands, onDone) => {
   pending = true
   send(commands)
-    .then(onDone, (error) => {
+    .then(onDone, async (error) => {
       log(`cube: ${error.message}`)
       retryAt = Date.now() + RETRY_MS
+      const ip = await discover()
+      if (ip && ip !== config.ip) {
+        moveTo(ip)
+        retryAt = 0
+      }
     })
     .finally(() => {
       pending = false
