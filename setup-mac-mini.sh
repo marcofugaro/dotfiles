@@ -424,8 +424,8 @@ set -g automatic-rename-format "#{?#{==:#{pane_current_path},$HOME},~,#{s|^$HOME
 set -g set-titles on
 set -g set-titles-string '#{user}@#{host_short}: #W'
 
-# A chat that needs you rings the bell: its tab turns red with a !, with a message instead of a sound
-set -g visual-bell on
+# A chat that needs you rings the bell: its tab turns red with a !, without a sound or a message
+set -g bell-action none
 
 # The status line is a row of tabs, in fixed colors that read in any terminal theme: the current tab white, one that
 # needs you red. Spacing is on a 4px scale, as near as cells allow: 2 cells (16px) each side of the name, 1 cell (8px)
