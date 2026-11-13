@@ -268,6 +268,36 @@ tic="$(brew --prefix ncurses)/bin/tic"
 xterm_mosh='xterm-mosh|xterm-256color for tmux under Mosh, use=xterm-256color,'
 "$tic" -x -o ~/.terminfo - <<< "$xterm_mosh"
 
+# Mouse selection as in a terminal without tmux, for both users' tmux
+tmux_selection() {
+  cat <<'EOF'
+
+# The mouse selects as in a terminal without tmux: the selection and the view stay put, and the text reaches the
+# device's clipboard on release, so Cmd-C finds it there. A double-click selects a word, a triple-click a line. These
+# change copy mode's emacs keys, which tmux would swap for vi's when $EDITOR mentions vi
+set -g mode-keys emacs
+bind -T copy-mode MouseDragEnd1Pane send -X copy-pipe-no-clear
+bind -T copy-mode DoubleClick1Pane select-pane \; send -X select-word \; send -X copy-pipe-no-clear
+bind -T copy-mode TripleClick1Pane select-pane \; send -X select-line \; send -X copy-pipe-no-clear
+bind -T root DoubleClick1Pane select-pane -t = \; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H ; send -X select-word ; send -X copy-pipe-no-clear }
+bind -T root TripleClick1Pane select-pane -t = \; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H ; send -X select-line ; send -X copy-pipe-no-clear }
+
+# tmux sends its own copies to the device as OSC 52 with no selection, which Mosh drops: it passes only 52;c;. This
+# adds the c when it's missing. A view picks it up when it connects
+set -s 'terminal-overrides[2]' '*:Ms=\E]52;%?%p1%l%t%p1%s%ec%;;%p2%s\007'
+
+# A click clears the selection, and at the bottom of the history goes back to the program. A key goes back too and
+# reaches the program, letters included, while Escape and Ctrl-c only go back, so they never stop Claude. Any also
+# catches mouse events, which have a position: those do nothing
+bind -T copy-mode MouseDown1Pane select-pane \; send -X clear-selection \; if -F '#{==:#{scroll_position},0}' { send -X cancel }
+bind -T copy-mode Any if -F '#{==:#{mouse_x},}' { send -X cancel ; send -K }
+unbind -T copy-mode Space ; unbind -T copy-mode , ; unbind -T copy-mode ';' ; unbind -T copy-mode F
+unbind -T copy-mode L ; unbind -T copy-mode N ; unbind -T copy-mode P ; unbind -T copy-mode R
+unbind -T copy-mode T ; unbind -T copy-mode X ; unbind -T copy-mode f ; unbind -T copy-mode g
+unbind -T copy-mode n ; unbind -T copy-mode q ; unbind -T copy-mode r ; unbind -T copy-mode t
+EOF
+}
+
 # The session admin, which `mini-admin` lands in: the mouse scrolls its scrollback, which Mosh doesn't keep, and what
 # runs there carries on when the connection drops
 cat > ~/.tmux.conf <<'EOF'
@@ -288,6 +318,7 @@ set -s 'terminal-overrides[1]' 'xterm-mosh:dim=\E[38;5;244m:AX@'
 set -g set-titles on
 set -g set-titles-string '#T'
 EOF
+tmux_selection >> ~/.tmux.conf
 
 # A running tmux reads its config only when it starts
 tmux source-file ~/.tmux.conf &> /dev/null
@@ -484,6 +515,7 @@ unbind-key -n C-a
 # Ctrl-f: fit the window to this device, like Ctrl-b r
 bind-key -N "Fit the window to this device" -n C-f refresh-client
 EOF
+tmux_selection | as_agent tee -a /Users/agent/.tmux.conf > /dev/null
 
 # A running tmux reads its config only when it starts
 as_agent zsh -lc 'tmux source-file ~/.tmux.conf' &> /dev/null

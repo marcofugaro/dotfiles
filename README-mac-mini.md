@@ -434,7 +434,9 @@ chats keep running when you disconnect. Background chats, further down, and chat
   a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, `agent@mini: <window>` as the
   terminal's tab title, and the keys below. Re-running the script reloads it. `<you>` gets a smaller one: the mouse
   on, a long scrollback, no status bar, the clipboard, and the shell's tab title. Both draw dim text in gray for
-  Mosh, which drops dim, like the git branch in the prompt and Claude's suggestions.
+  Mosh, which drops dim, like the git branch in the prompt and Claude's suggestions. In both, a mouse selection stays
+  where it is and reaches your device's clipboard on release, Mosh included, so `Cmd-C` finds it there; a click or a
+  key goes back to the program. Tabby keeps `Cmd-C` for its own selection, so it never reaches tmux.
 - `~/.terminfo`, for `agent` and `<you>`, with `xterm-mosh`: `xterm-256color` by another name, which tmux runs as
   under Mosh (`mini`, `mini-admin`, Termius with Mosh), so the gray is for those devices alone.
 - `~/trust-folder.py`, which `Ctrl-n` runs before Claude to mark the chat's folder in `~/Code` as trusted in
