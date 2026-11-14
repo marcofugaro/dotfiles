@@ -398,42 +398,12 @@ if [[ -n "$SSH_CONNECTION" && -z "$TMUX" && "$TERM_PROGRAM" != "vscode" && $- ==
 fi
 EOF
 
-# Ctrl-n runs it before Claude, so a chat in a folder of ~/Code starts without the trust question
-as_agent tee /Users/agent/trust-folder.py > /dev/null <<'EOF'
-# Marks the current folder as trusted in ~/.claude.json, if it's in ~/Code, so Claude starts there without asking.
-# It holds Claude Code's own lock on the file while writing, and leaves the file alone if it can't get it.
-import json, os, sys, time
-
-config_path = os.path.expanduser('~/.claude.json')
-lock = config_path + '.lock'
-code = os.path.realpath(os.path.expanduser('~/Code'))
-folder = os.path.realpath(os.getcwd())
-
-if (folder != code and not folder.startswith(code + os.sep)) or not os.path.exists(config_path):
-    sys.exit()
-
-for _ in range(30):
-    try:
-        os.mkdir(lock)
-        break
-    except FileExistsError:
-        time.sleep(0.1)
-else:
-    sys.exit()
-
-try:
-    with open(config_path) as f:
-        config = json.load(f)
-    project = config.setdefault('projects', {}).setdefault(folder, {})
-    if project.get('hasTrustDialogAccepted') is not True:
-        project['hasTrustDialogAccepted'] = True
-        temp = f'{config_path}.{os.getpid()}.tmp'
-        with open(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-        os.replace(temp, config_path)
-finally:
-    os.rmdir(lock)
-EOF
+# Trust ~/Code and its repos, so Claude starts in them without asking; mini-up.sh, Ctrl-n, the shell's claude and
+# every chat's start run it again, for new clones
+as_agent rm -f /Users/agent/trust-folder.py
+as_agent mkdir -p /Users/agent/.claude
+sudo install -o agent -g staff -m 644 trust-code.py /Users/agent/.claude/trust-code.py
+as_agent python3 -I /Users/agent/.claude/trust-code.py
 
 as_agent tee /Users/agent/.tmux.conf > /dev/null <<'EOF'
 set -g mouse on
@@ -488,7 +458,7 @@ set -g status-format[2] "$BLANK"
 # Ctrl-n: a new Claude chat in a window of its own, asking for a folder in ~/Code and a name; the folder is trusted
 bind-key -N "New Claude chat in its own window" -n C-n command-prompt -p "repo in ~/Code:,chat name:" {
   if-shell "test -n '%2' && test -d ~/Code/'%1'" {
-    new-window -S -n "%2" -c "~/Code/%1" "python3 -I ~/trust-folder.py; exec ~/.local/bin/claude -n '%2'"
+    new-window -S -n "%2" -c "~/Code/%1" "python3 -I ~/.claude/trust-code.py; exec ~/.local/bin/claude -n '%2'"
   } {
     display-message -d 5000 "No chat opened: it needs a name and a folder in ~/Code"
   }
@@ -527,6 +497,9 @@ as_agent tee /Users/agent/mini-up.sh > /dev/null <<'EOF'
 # Starts the main chat in tmux, and each listed repo's dev server in a window named after it, unless running.
 # launchd runs it at boot and every 3 minutes; you can also run it yourself: zsh -l ~/mini-up.sh
 cd ~/Code || exit 1
+
+# Trust ~/Code's folders, new clones included, so Claude starts in them without asking
+python3 -I ~/.claude/trust-code.py
 
 # After a power cut the router can take minutes to come back, and Claude needs the internet
 until curl -sS -m 5 -o /dev/null https://api.anthropic.com; do
@@ -584,6 +557,11 @@ def add_missing(target, values):
             target.setdefault(key, value)
 
 add_missing(settings, defaults)
+
+# The trust of ~/Code at every start, beside the lamp's hooks
+start = settings.setdefault('hooks', {}).setdefault('SessionStart', [])
+if not any('trust-code.py' in h.get('command', '') for entry in start for h in entry.get('hooks', [])):
+    start.append({'hooks': [{'type': 'command', 'command': 'python3 -I ~/.claude/trust-code.py'}]})
 with open(path, 'w') as f:
     json.dump(settings, f, indent=2, ensure_ascii=False)
     f.write('\n')

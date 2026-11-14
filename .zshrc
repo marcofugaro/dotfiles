@@ -110,6 +110,12 @@ PATH="$(brew --prefix)/opt/python/libexec/bin:$PATH"
 # add to the path Claude Code
 PATH="$HOME/.local/bin:$PATH"
 
+# Claude trusts ~/Code's folders first, so a repo cloned a moment ago starts without the trust question
+claude() {
+  [[ -r ~/.claude/trust-code.py ]] && python3 -I ~/.claude/trust-code.py
+  command claude "$@"
+}
+
 # build native extensions for arm64
 ARCHFLAGS="-arch arm64"
 

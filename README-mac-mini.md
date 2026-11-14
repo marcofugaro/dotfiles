@@ -439,8 +439,12 @@ chats keep running when you disconnect. Background chats, further down, and chat
   key goes back to the program. Tabby keeps `Cmd-C` for its own selection, so it never reaches tmux.
 - `~/.terminfo`, for `agent` and `<you>`, with `xterm-mosh`: `xterm-256color` by another name, which tmux runs as
   under Mosh (`mini`, `mini-admin`, Termius with Mosh), so the gray is for those devices alone.
-- `~/trust-folder.py`, which `Ctrl-n` runs before Claude to mark the chat's folder in `~/Code` as trusted in
-  `~/.claude.json`, holding Claude Code's own lock on that file.
+- `~/.claude/trust-code.py`, for `agent` and `<you>`, from [trust-code.py](trust-code.py), which marks `~/Code`
+  and every git repo up to three folders deep in it as trusted in `~/.claude.json`, holding Claude Code's own lock on
+  that file. Claude's trust of a folder covers the folders below it but stops at a git repo's root, so each repo needs
+  its own entry. It runs before Claude starts from the shell's `claude` and `Ctrl-n`, at the start of every chat from
+  a `SessionStart` hook, so a repo cloned in one chat is trusted in the next, even one started from the Claude app,
+  and every 3 minutes from `mini-up.sh`.
 - `~/.zshenv`, for `agent` and `<you>`, which puts Homebrew on the path for commands run over SSH, as Mosh's are. It
   also makes a Mosh server quit a day after its device went away, which closes that view.
 
@@ -505,8 +509,8 @@ starts a new main chat within 5 minutes.
 new window opens with Claude in that folder, ready for your first prompt, and the other device sees its tab.
 - Name it after the task, like `fix-login`, not after the repo: a taken name, like a dev server's window or `claude`,
   opens that window instead. A folder that isn't in `~/Code`, or no name, opens nothing.
-- Ctrl-n marks the folder as trusted before Claude starts, so no chat asks whether to trust it. This also applies
-  any hooks or MCP servers in a cloned repo's `.claude/` without asking, so read those first.
+- Every folder in `~/Code` is trusted, so no chat asks whether to trust it. This also applies any hooks or MCP
+  servers in a cloned repo's `.claude/` without asking, so read those first.
 - A chat edits the repo's own files, so its dev server shows the changes. For parallel tasks on one repo, your rules
   have Claude use a worktree, which the dev server doesn't serve.
 - `/exit` ends a chat and closes its window; its conversation stays. To continue it, `Ctrl-n` with the same folder

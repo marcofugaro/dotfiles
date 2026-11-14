@@ -81,8 +81,13 @@ section "Claude Code"
 
 mkdir -p ~/.claude
 
-# Claude Code settings, merged into what's there: Opus at xhigh effort, the colorblind-friendly dark theme, and
-# background sessions that edit the checkout in place, without a worktree
+# Trust ~/Code and its repos, so Claude starts in them without asking; the shell's claude and every chat's start run it
+# again, for new clones
+cp trust-code.py ~/.claude/trust-code.py
+python3 -I ~/.claude/trust-code.py
+
+# Claude Code settings, merged into what's there: Opus at xhigh effort, the colorblind-friendly dark theme,
+# background sessions that edit the checkout in place, without a worktree, and the trust of ~/Code at every start
 python3 -I - <<'PY'
 import json, os
 
@@ -92,6 +97,9 @@ settings['model'] = 'opus'
 settings.setdefault('modelSettings', {}).setdefault('claude-opus-5-5', {})['effortLevel'] = 'xhigh'
 settings['theme'] = 'dark-daltonized'
 settings.setdefault('worktree', {})['bgIsolation'] = 'none'
+start = settings.setdefault('hooks', {}).setdefault('SessionStart', [])
+if not any('trust-code.py' in h.get('command', '') for entry in start for h in entry.get('hooks', [])):
+    start.append({'hooks': [{'type': 'command', 'command': 'python3 -I ~/.claude/trust-code.py'}]})
 with open(path, 'w') as f:
     json.dump(settings, f, indent=2)
     f.write('\n')
