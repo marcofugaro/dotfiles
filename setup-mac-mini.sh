@@ -288,13 +288,21 @@ set -s 'terminal-overrides[2]' '*:Ms=\E]52;%?%p1%l%t%p1%s%ec%;;%p2%s\007'
 
 # A click clears the selection, and at the bottom of the history goes back to the program. A key goes back too and
 # reaches the program, letters included, while Escape and Ctrl-c only go back, so they never stop Claude. Any also
-# catches mouse events, which have a position: those do nothing
+# catches mouse events, which have a position: those do nothing. A tap or scroll on a tab goes to the key table of
+# that tab's window, so these keep the tab of a window in copy mode working like the others
 bind -T copy-mode MouseDown1Pane select-pane \; send -X clear-selection \; if -F '#{==:#{scroll_position},0}' { send -X cancel }
 bind -T copy-mode Any if -F '#{==:#{mouse_x},}' { send -X cancel ; send -K }
+bind -T copy-mode MouseDown1Status switch-client -t =
+bind -T copy-mode WheelUpStatus previous-window
+bind -T copy-mode WheelDownStatus next-window
 unbind -T copy-mode Space ; unbind -T copy-mode , ; unbind -T copy-mode ';' ; unbind -T copy-mode F
 unbind -T copy-mode L ; unbind -T copy-mode N ; unbind -T copy-mode P ; unbind -T copy-mode R
 unbind -T copy-mode T ; unbind -T copy-mode X ; unbind -T copy-mode f ; unbind -T copy-mode g
 unbind -T copy-mode n ; unbind -T copy-mode q ; unbind -T copy-mode r ; unbind -T copy-mode t
+
+# Ctrl-w, Ctrl-n and Ctrl-f go back too and then do what they do at the bottom, like closing the window, instead of
+# copy mode's copy, line down and cursor right
+unbind -T copy-mode C-w ; unbind -T copy-mode C-n ; unbind -T copy-mode C-f
 EOF
 }
 
