@@ -12,7 +12,7 @@ export SUDO_PROMPT="${bold}${yellow}Please enter your admin password, for sudo:$
 # Mac mini setup: run at the mini itself, from the admin account, after setup.sh.
 # Before running it, in the Tailscale admin console: save the access policy that owns tag:mini, and turn on
 # MagicDNS and HTTPS certificates (README-mac-mini.md, step 5).
-# At the end it turns FileVault off, then asks for Find My, the phone on Tailscale, the SSH keys, the Claude and
+# At the end it turns FileVault off and automatic login on, then asks for Find My, the phone on Tailscale, the SSH keys, the Claude and
 # GitHub logins and the repos, explaining each. Safe to run again: it skips what's done, so run it again to add keys
 # or repos.
 #   ./setup-mac-mini.sh --lock-ssh   allows only key logins from the tailnet, done for you once both users have a key
@@ -657,6 +657,24 @@ section "FileVault"
 if fdesetup isactive &> /dev/null; then
   ask "Turning FileVault off. Please enter your user name and password:"
   sudo fdesetup disable
+fi
+
+
+section "Automatic login"
+
+# Log you in at boot: with nobody at the console, macOS's audio service, audiomxd, loops on configd and keeps a CPU
+# core busy. It needs FileVault off
+autologin_on() {
+  [ "$(defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2> /dev/null)" = "$(whoami)" ]
+}
+if ! autologin_on; then
+  ask "Turning on automatic login for $(whoami). Please enter your password:"
+  sudo sysadminctl -autologin set -userName "$(whoami)" -password -
+  if autologin_on; then
+    ok "Automatic login is on, from the next restart"
+  else
+    warn "Automatic login failed, see above: please run this script again"
+  fi
 fi
 
 
