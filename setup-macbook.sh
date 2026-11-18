@@ -117,6 +117,22 @@ else
 fi
 
 
+section "Pasting images to the mini"
+
+# Claude on the mini can't read this Mac's clipboard, so Hammerspoon takes Ctrl-V in Tabby's tabs on the mini: it sends
+# the clipboard's image over SSH and pastes its path, which Claude attaches
+if [ ! -e /Applications/Hammerspoon.app ]; then
+  brew install --cask hammerspoon
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+  ask "Please turn on Hammerspoon in Accessibility, which just opened: it reads Tabby's tab title and pastes"
+fi
+mkdir -p ~/.hammerspoon
+cp hammerspoon/init.lua ~/.hammerspoon/init.lua
+# Restart it on the new config, which also starts it at login
+pkill -x Hammerspoon && while pgrep -x Hammerspoon > /dev/null; do sleep 0.1; done
+open -g -a Hammerspoon
+
+
 section "Settings"
 
 # The global Claude Code instructions; on the mini, setup-mac-mini.sh writes them with its own rules added

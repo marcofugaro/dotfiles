@@ -465,7 +465,10 @@ Check the boot job once with a power cut: switch the smart plug off and on, or r
   changes, with a `Last contact` banner until it's back, and closing the tab doesn't ask to stop it. The tab closes
   when the session ends; if the mini never answers, `Ctrl-^ .` gives up. `ssh mini` still works, without the
   reconnecting. `mini-admin` does the same as `<you>`, landing in your own tmux session `admin`: Mosh keeps no
-  scrollback, so the trackpad scrolls tmux's.
+  scrollback, so the trackpad scrolls tmux's. `Ctrl-V` in a chat pastes the MacBook's clipboard image, like a
+  screenshot or an image file copied in Finder: Hammerspoon, from `setup-macbook.sh`, sends it to
+  `/tmp/agent-clipboard` on the mini and pastes its path, which Claude attaches. It goes by the tab title
+  `agent@mini: …`, or `<you>@mini:…` in `mini-admin`'s shell; images there go after a day.
 - **Phone:** with Tailscale on, tap the host `mini` in Termius, and leave its Startup Command empty: the mini opens
   the view itself. In Android's settings for Termius, turn off battery optimization, or Android may drop the
   connection when you switch apps. On a shaky connection, turn on **Use Mosh** in the host's settings: the session can
