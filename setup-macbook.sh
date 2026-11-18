@@ -40,6 +40,19 @@ killall Dock
 "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --install-extension ms-vscode-remote.remote-ssh
 
 
+section "Xcode"
+
+# Xcode for Instruments and xctrace traces, unless one is installed. xcodes downloads it from Apple, faster with aria2,
+# then selects it, accepts the license and installs the first-launch components itself
+if ! ls -d /Applications/Xcode*.app &> /dev/null; then
+  for package in xcodes aria2; do
+    brew list "$package" &> /dev/null || brew install "$package"
+  done
+  ask "Please sign in with your Apple ID when xcodes asks, then enter the two-factor code and your admin password"
+  xcodes install --latest --select --empty-trash
+fi
+
+
 section "Tailscale"
 
 # Signed in to Tailscale, by the app's own CLI. Signing in has no command, so open the app and carry on once it's in
