@@ -23,7 +23,6 @@ install_app() {
 install_app google-chrome "Google Chrome"
 install_app visual-studio-code "Visual Studio Code"
 install_app android-file-transfer "Android File Transfer"
-install_app blender Blender
 install_app tabby Tabby
 install_app tailscale-app Tailscale
 
@@ -65,9 +64,6 @@ fi
 
 
 section "SSH to the mini"
-
-# Mosh, which `mini` and `mini-admin` connect with
-brew list mosh &> /dev/null || brew install mosh
 
 # A key just for the mini, and `ssh mini` (agent) and `ssh mini-admin` (your account, same name as here) over MagicDNS
 if [ ! -e ~/.ssh/id_ed25519_mini ]; then

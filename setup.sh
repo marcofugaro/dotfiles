@@ -60,8 +60,24 @@ brew_install python
 # Install commands
 brew_install node diff-so-fancy tree gh ghostscript bat
 
+# Install Mosh, which the MacBook connects to the mini with
+brew_install mosh
+
 # Install npm global commands
 command -v fkill > /dev/null || npm install --global fkill-cli
+
+
+section "Blender"
+
+# Install Blender, unless it's in /Applications already, from Homebrew or not
+[ -e /Applications/Blender.app ] || brew install --cask blender
+
+# Copy the Blender preferences and startup file into the installed version's config folder
+if blender_version="$(plutil -extract CFBundleShortVersionString raw /Applications/Blender.app/Contents/Info.plist 2> /dev/null)"; then
+  blender_config=~/Library/"Application Support/Blender/$(cut -d . -f 1,2 <<< "$blender_version")/config"
+  mkdir -p "$blender_config"
+  cp blender/startup.blend blender/userpref.blend "$blender_config"
+fi
 
 
 section "Touch ID for sudo"

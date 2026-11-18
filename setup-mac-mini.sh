@@ -63,14 +63,15 @@ as_agent() {
 }
 
 # Blender Lab's MCP server for agent's Claude, with its add-on in agent's Blender, which runs in the background
-# since the mini has no screen. Each Blender version keeps its own add-ons, so --update installs it again
+# since the mini has no screen. Each Blender version keeps its own settings and add-ons, so --update copies and
+# installs them again
 blender_mcp_version=1.0.3
 agent_blender=/Users/agent/.local/share/blender/Blender.app
 install_blender_mcp() {
   # Homebrew's Blender waits on a first-launch Gatekeeper prompt that nobody can click, and macOS keeps scripts from
   # clearing it on apps in /Applications. So agent runs an APFS clone, which takes no space, with the flag cleared
   # before its first launch, after which macOS locks it too; a new clone comes with each Blender version
-  local version dir
+  local version config dir
   version="$(plutil -extract CFBundleShortVersionString raw /Applications/Blender.app/Contents/Info.plist)"
   if [ "$(as_agent plutil -extract CFBundleShortVersionString raw "$agent_blender/Contents/Info.plist" 2> /dev/null)" != "$version" ] ||
     as_agent xattr -p com.apple.quarantine "$agent_blender" &> /dev/null; then
@@ -90,6 +91,13 @@ install_blender_mcp() {
 exec "$agent_blender/Contents/MacOS/Blender" "\$@"
 EOF
   as_agent chmod 755 /Users/agent/.local/bin/blender
+
+  # Your Blender preferences, which enable the add-on, and startup file, read here since agent can't enter the admin home
+  config="/Users/agent/Library/Application Support/Blender/$(cut -d . -f 1,2 <<< "$version")/config"
+  as_agent mkdir -p "$config"
+  for file in startup.blend userpref.blend; do
+    as_agent tee "$config/$file" > /dev/null < "blender/$file"
+  done
 
   dir="$(mktemp -d /tmp/blender-mcp.XXXXXX)"
   chmod 755 "$dir"
@@ -171,11 +179,6 @@ brew_install() {
   done
 }
 
-# Install an application, unless it's in /Applications already, from Homebrew or not
-install_app() {
-  [ -e "/Applications/$2.app" ] || brew install --cask "$1"
-}
-
 
 section "System settings"
 
@@ -214,16 +217,13 @@ defaults write com.apple.dock persistent-apps -array \
 killall Dock
 
 
-section "Packages and apps"
+section "Packages"
 
-# Install tmux, Mosh, the Tailscale daemon, Git LFS, and uv for the Blender MCP server
-brew_install tmux mosh tailscale git-lfs uv
+# Install tmux, the Tailscale daemon, Git LFS, and uv for the Blender MCP server
+brew_install tmux tailscale git-lfs uv
 
 # Git LFS's filters in ~/.gitconfig, set again each run since setup.sh replaces it
 git lfs install > /dev/null
-
-# Install applications
-install_app blender Blender
 
 allow_mosh
 
