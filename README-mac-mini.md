@@ -207,7 +207,7 @@ while you're in the other city.
 |---|---|
 | Power cut | The mini starts again when power returns. A small UPS rides out short cuts; put the router on it too. |
 | FileVault after a restart | It's off, so nothing waits at an unlock screen (step 1). |
-| The login window after a restart | Automatic login logs you in, or macOS's audio service keeps a CPU core busy (step 2). |
+| The login window after a restart | Automatic login logs you in, so gpudebug works and macOS's audio service doesn't keep a CPU core busy (step 2). |
 | Claude after a restart | launchd starts the tmux session with Claude and the dev servers at boot, once the internet is back (step 10). |
 | The mini freezes | A smart plug you can switch from your phone: off and on again, and the mini boots. |
 | macOS updates | The ones that need a restart wait for you, so they don't cut off a task (step 14). |
@@ -266,8 +266,9 @@ Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (ste
   Leave "Allow full disk access for remote users" off.
 - **Script:** Screen Sharing is on, for "Only these users": `<you>`. From the MacBook, `open vnc://mini` (or
   `vnc://mini.<tailnet>.ts.net`) and log in as `<you>`; the Screen Sharing app keeps it in its list. It also answers on the home network, since macOS can't limit it to the tailnet.
-- **Script:** automatic login logs `<you>` in at boot, and asks for your password once. With nobody logged in at the
-  screen, macOS's audio service, `audiomxd`, loops on `configd` and keeps a CPU core busy. It needs FileVault off. The
+- **Script:** automatic login logs `<you>` in at boot, and asks for your password once. It starts the GUI session's
+  services, like `gputoolsserviced`, which gpudebug needs. With nobody logged in at the screen, macOS's audio service,
+  `audiomxd`, loops on `configd` and keeps a CPU core busy. It needs FileVault off. The
   cost is that anyone who plugs a keyboard and a display into the mini gets your session.
 - **Ethernet:** connect the mini by cable if you can, it's steadier than Wi-Fi. **Script:** Wi-Fi stays on either
   way, for Find My.

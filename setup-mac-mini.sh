@@ -662,8 +662,8 @@ fi
 
 section "Automatic login"
 
-# Log you in at boot: with nobody at the console, macOS's audio service, audiomxd, loops on configd and keeps a CPU
-# core busy. It needs FileVault off
+# Log you in at boot, so the GUI session's services run: gputoolsserviced, for gpudebug, needs one, and with nobody at
+# the console macOS's audio service, audiomxd, loops on configd and keeps a CPU core busy. It needs FileVault off
 autologin_on() {
   [ "$(defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2> /dev/null)" = "$(whoami)" ]
 }
