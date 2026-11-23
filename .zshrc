@@ -125,6 +125,9 @@ autoload -Uz compinit
 if [[ -O /opt/homebrew ]]; then compinit; else compinit -u; fi
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
+# ..<Tab> completes to ../
+zstyle ':completion:*' special-dirs ..
+
 # emacs keybindings, which shift-select builds on
 bindkey -e
 

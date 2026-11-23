@@ -207,6 +207,10 @@ sudo launchctl print system/com.apple.screensharing &> /dev/null || sudo launchc
 # Make the admin home folder private
 sudo chmod 700 "$HOME"
 
+# Developer Mode: debuggers and GPU tools like gpudebug reach your own processes without a password dialog, which
+# nobody here can answer and which leaves gputoolsserviced waiting until a restart
+sudo DevToolsSecurity -enable > /dev/null
+
 # Set the Dock apps, after Finder
 dock_item() {
   printf '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>%s</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>' "$1"
@@ -351,6 +355,9 @@ sudo dseditgroup -o edit -a "$(whoami)" -t user com.apple.access_ssh
 sudo dseditgroup -o edit -a agent -t user com.apple.access_ssh
 sudo launchctl enable system/com.openssh.sshd
 sudo launchctl print system/com.openssh.sshd &> /dev/null || sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist
+
+# Developer Mode covers admins and the _developer group: in it, agent's GPU tools work without a password dialog too
+sudo dseditgroup -o edit -a agent -t user _developer
 
 # Install Claude Code in its home, where it updates itself
 as_agent test -x /Users/agent/.local/bin/claude || as_agent bash -c 'cd ~ && curl -fsSL https://claude.ai/install.sh | bash'
