@@ -207,7 +207,7 @@ while you're in the other city.
 |---|---|
 | Power cut | The mini starts again when power returns. A small UPS rides out short cuts; put the router on it too. |
 | FileVault after a restart | It's off, so nothing waits at an unlock screen (step 1). |
-| The login window after a restart | Automatic login logs you in, so gpudebug works and macOS's audio service doesn't keep a CPU core busy (step 2). |
+| The login window after a restart | Automatic login logs `agent` in, so its chats' gpudebug works and macOS's audio service doesn't keep a CPU core busy (step 2). |
 | Claude after a restart | launchd starts the tmux session with Claude and the dev servers at boot, once the internet is back (step 10). |
 | The mini freezes | A smart plug you can switch from your phone: off and on again, and the mini boots. |
 | macOS updates | The ones that need a restart wait for you, so they don't cut off a task (step 14). |
@@ -266,10 +266,11 @@ Two scripts from the dotfiles do most of the work, from `<you>`: `setup.sh` (ste
   Leave "Allow full disk access for remote users" off.
 - **Script:** Screen Sharing is on, for "Only these users": `<you>`. From the MacBook, `open vnc://mini` (or
   `vnc://mini.<tailnet>.ts.net`) and log in as `<you>`; the Screen Sharing app keeps it in its list. It also answers on the home network, since macOS can't limit it to the tailnet.
-- **Script:** automatic login logs `<you>` in at boot, and asks for your password once. It starts the GUI session's
-  services, like `gputoolsserviced`, which gpudebug needs. With nobody logged in at the screen, macOS's audio service,
-  `audiomxd`, loops on `configd` and keeps a CPU core busy. It needs FileVault off. The
-  cost is that anyone who plugs a keyboard and a display into the mini gets your session.
+- **Script:** automatic login logs `agent` in at boot, and asks for its password once. It starts the GUI session's
+  services, like `gputoolsserviced`, which gpudebug needs, for `agent`'s chats: `<you>` has no GUI session then, so
+  gpudebug works only as `agent`. With nobody logged in at the screen, macOS's audio service, `audiomxd`, loops on
+  `configd` and keeps a CPU core busy. It needs FileVault off. The cost is that anyone who plugs a keyboard and a
+  display into the mini gets `agent`'s session.
 - **Ethernet:** connect the mini by cable if you can, it's steadier than Wi-Fi. **Script:** Wi-Fi stays on either
   way, for Find My.
 - **For running it from afar:** plug the mini into a smart plug you can switch from your phone, and set the plug to
@@ -428,10 +429,10 @@ chats keep running when you disconnect. Background chats, further down, and chat
 **Script:** for `agent`, `setup-mac-mini.sh` sets up:
 - `~/mini-up.sh`, which waits for the internet, then starts the main chat in the window `claude`, in `~/Code`, and
   the dev server of each repo in its `serve=(...)` list in a window named after the repo, skipping what's already
-  running. A launchd job runs it as `agent` at every boot, before anyone logs in, and every 3 minutes after, so the
-  main chat or a listed dev server that stops comes back. To stop a dev server for good, take its repo off the list in
-  `setup-mac-mini.sh` and close its window. You can also run it
-  yourself: `zsh -l ~/mini-up.sh`.
+  running. A launchd job runs it as `agent` at every boot and every 3 minutes after, so the main chat or a listed dev
+  server that stops comes back. It runs in `agent`'s login context, where tmux and its chats reach the services of
+  its GUI session, like `gputoolsserviced`. To stop a dev server for good, take its repo off the list in
+  `setup-mac-mini.sh` and close its window. You can also run it yourself: `zsh -l ~/mini-up.sh`.
 - Lines in `~/.zshrc` that open a view of `main`, on the main chat, at every SSH login, like levelsio. VS Code's
   terminals skip it: type `chats` there. A view goes away when its device leaves; the windows stay.
 - `~/.tmux.conf`: the mouse on, a long scrollback, Claude's copies reaching your device's clipboard, window names
@@ -455,8 +456,8 @@ chats keep running when you disconnect. Background chats, further down, and chat
 
 Check the boot job once with a power cut: switch the smart plug off and on, or run `sudo reboot`.
 1. About a minute later the main chat should appear in the Claude app, and `ssh mini` should land in it.
-2. In a shell window (`Ctrl-t`), run a repo's GPU tests. A tmux started by launchd at boot runs outside any login,
-   and I couldn't confirm that macOS gives such processes the GPU. If the tests find no GPU, remove the job as `<you>`
+2. In a shell window (`Ctrl-t`), run a repo's GPU tests and gpudebug, which needs the services of `agent`'s GUI
+   session, like `gputoolsserviced`. If the tests find no GPU, remove the job as `<you>`
    with `sudo launchctl bootout system/local.mini-up`, again after each run of `setup-mac-mini.sh`, which reinstalls
    it. Then, as `agent`, stop it with `tmux kill-server`, which ends every chat and dev server, and after each restart
    run `zsh -l ~/mini-up.sh` yourself over SSH (it works from the phone too).

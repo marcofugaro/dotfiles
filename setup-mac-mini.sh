@@ -609,31 +609,33 @@ EOF
 sudo chown root:wheel "/Library/Application Support/ClaudeCode/managed-settings.json"
 sudo chmod 644 "/Library/Application Support/ClaudeCode/managed-settings.json"
 
-# Run mini-up.sh as agent at every boot and every 3 minutes, so what stops comes back
-sudo tee /Library/LaunchDaemons/local.mini-up.plist > /dev/null <<'EOF'
+# Run mini-up.sh as agent at every boot and every 3 minutes, so what stops comes back. It starts as root to enter
+# agent's login context, where tmux and its chats reach the services of agent's GUI session, like gputoolsserviced
+# for gpudebug: a job that runs as agent from the start stays outside it
+agent_uid=$(id -u agent)
+sudo tee /Library/LaunchDaemons/local.mini-up.plist > /dev/null <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
   <string>local.mini-up</string>
-  <key>UserName</key>
-  <string>agent</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/bin/launchctl</string>
+    <string>asuser</string>
+    <string>$agent_uid</string>
+    <string>/usr/bin/sudo</string>
+    <string>-u</string>
+    <string>agent</string>
+    <string>-H</string>
+    <string>/usr/bin/env</string>
+    <string>LANG=en_US.UTF-8</string>
+    <string>TERM=xterm-256color</string>
     <string>/bin/zsh</string>
     <string>-l</string>
     <string>/Users/agent/mini-up.sh</string>
   </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>HOME</key>
-    <string>/Users/agent</string>
-    <key>LANG</key>
-    <string>en_US.UTF-8</string>
-    <key>TERM</key>
-    <string>xterm-256color</string>
-  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>StartInterval</key>
@@ -669,18 +671,21 @@ fi
 
 section "Automatic login"
 
-# Log you in at boot, so the GUI session's services run: gputoolsserviced, for gpudebug, needs one, and with nobody at
-# the console macOS's audio service, audiomxd, loops on configd and keeps a CPU core busy. It needs FileVault off
+# Log agent in at boot, so its GUI session's services run: gputoolsserviced, for its chats' gpudebug, needs one, and
+# with nobody at the console macOS's audio service, audiomxd, loops on configd and keeps a CPU core busy. It needs
+# FileVault off
+# sysadminctl stores the password in /etc/kcpassword only from a desktop session, and sets the user without it otherwise
 autologin_on() {
-  [ "$(defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2> /dev/null)" = "$(whoami)" ]
+  [ "$(defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2> /dev/null)" = agent ] &&
+    [ -e /etc/kcpassword ]
 }
 if ! autologin_on; then
-  ask "Turning on automatic login for $(whoami). Please enter your password:"
-  sudo sysadminctl -autologin set -userName "$(whoami)" -password -
+  ask "Turning on automatic login for agent. Please enter agent's password:"
+  sudo sysadminctl -autologin set -userName agent -password -
   if autologin_on; then
     ok "Automatic login is on, from the next restart"
   else
-    warn "Automatic login failed, see above: please run this script again"
+    warn "Automatic login failed: please run this script again from Terminal on the mini's screen, over Screen Sharing"
   fi
 fi
 
@@ -808,8 +813,9 @@ for repo in $repos; do
   add_repo "$repo"
 done
 if [ -n "$repos" ]; then
-  as_agent zsh -l /Users/agent/mini-up.sh
-  ok "Their dev servers are running, each in the tmux window named after its repo"
+  # through the boot job, so the dev servers start in agent's login context too
+  sudo launchctl kickstart -k system/local.mini-up
+  ok "Their dev servers are starting, each in the tmux window named after its repo"
 fi
 
 echo
