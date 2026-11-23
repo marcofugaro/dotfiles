@@ -120,7 +120,8 @@ fi
 section "Pasting images to the mini"
 
 # Claude on the mini can't read this Mac's clipboard, so Hammerspoon takes Ctrl-V in Tabby's tabs on the mini: it sends
-# the clipboard's image over SSH and pastes its path, which Claude attaches
+# the clipboard's image over SSH and pastes its path, which Claude attaches. It also passes Cmd-C on to tmux there,
+# which copies the selection Tabby can't see
 if [ ! -e /Applications/Hammerspoon.app ]; then
   brew install --cask hammerspoon
   open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"

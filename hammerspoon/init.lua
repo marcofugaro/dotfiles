@@ -1,13 +1,14 @@
 -- Ctrl-V in a Tabby tab on the mini pastes this Mac's clipboard image: Claude Code there can't read this clipboard, so
 -- the image goes to the mini over SSH and its path is pasted, which Claude attaches as the image. Any other Ctrl-V
 -- reaches Tabby as usual.
+-- Cmd-C there also copies the selection of tmux or Claude, which Tabby can't see.
 
 -- Start at login
 hs.autoLaunch(true)
 
 local imageExtensions = { png = true, jpg = true, jpeg = true, gif = true, webp = true }
 local imageFile = hs.fs.temporaryDirectory() .. "mini-clipboard.png"
-local pasteKey, upload, restore
+local pasteKey, copyKey, upload, restore
 
 -- The account the focused tab is on at the mini, from the title the mini sets, like agent@mini: claude
 local function miniAccount()
@@ -65,9 +66,24 @@ pasteKey = hs.hotkey.new({ "ctrl" }, "v", function()
   pasteKey:enable()
 end)
 
--- The key is taken only while Tabby is in front. Global, so it isn't garbage collected
+-- Tabby's Cmd-C copies only Tabby's own selection, so on the mini Ctrl-Option-Shift-F12 follows it, which tmux copies
+-- its selection with, or Claude's
+copyKey = hs.hotkey.new({ "cmd" }, "c", function()
+  copyKey:disable()
+  hs.eventtap.keyStroke({ "cmd" }, "c")
+  copyKey:enable()
+  if miniAccount() then hs.eventtap.keyStroke({ "ctrl", "alt", "shift" }, "f12") end
+end)
+
+-- The keys are taken only while Tabby is in front. Global, so it isn't garbage collected
 local function follow(app)
-  if app and app:name() == "Tabby" then pasteKey:enable() else pasteKey:disable() end
+  if app and app:name() == "Tabby" then
+    pasteKey:enable()
+    copyKey:enable()
+  else
+    pasteKey:disable()
+    copyKey:disable()
+  end
 end
 tabbyWatcher = hs.application.watcher.new(function(_, event, app)
   if event == hs.application.watcher.activated then follow(app) end

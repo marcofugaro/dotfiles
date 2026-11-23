@@ -439,10 +439,13 @@ chats keep running when you disconnect. Background chats, further down, and chat
   that stay as given, a red tab with a `!` instead of
   a sound when a chat needs you, a bar of tabs tall enough to tap on the phone, `agent@mini: <window>` as the
   terminal's tab title, and the keys below. Re-running the script reloads it. `<you>` gets a smaller one: the mouse
-  on, a long scrollback, no status bar, the clipboard, and the shell's tab title. Both draw dim text in gray for
-  Mosh, which drops dim, like the git branch in the prompt and Claude's suggestions. In both, a mouse selection stays
-  where it is and reaches your device's clipboard on release, Mosh included, so `Cmd-C` finds it there; a click or a
-  key goes back to the program. Tabby keeps `Cmd-C` for its own selection, so it never reaches tmux.
+  on, a long scrollback, no status bar, the clipboard, and the shell's tab title, with `<you>@mini:` in front of
+  another program's, like Claude's. Both draw dim text in gray for Mosh, which drops dim, like the git branch in the
+  prompt and Claude's suggestions. In both, a mouse selection stays where it is and copies nothing until `Cmd-C`,
+  which sends it to your device's clipboard, Mosh included; a click or a key goes back to the program. Tabby keeps
+  `Cmd-C` for its own selection, so Hammerspoon follows it with `Ctrl-Option-Shift-F12`, which tmux takes as the
+  copy. In Claude's chats the selection is Claude's own, with Claude's Copy on select turned off in `~/.claude.json`
+  for both users: tmux passes the key on as Claude's `Cmd-C`, and `Ctrl-C` copies it too.
 - `~/.terminfo`, for `agent` and `<you>`, with `xterm-mosh`: `xterm-256color` by another name, which tmux runs as
   under Mosh (`mini`, `mini-admin`, Termius with Mosh), so the gray is for those devices alone.
 - `~/.claude/trust-code.py`, for `agent` and `<you>`, from [trust-code.py](trust-code.py), which marks `~/Code`
@@ -470,7 +473,8 @@ Check the boot job once with a power cut: switch the smart plug off and on, or r
   scrollback, so the trackpad scrolls tmux's. `Ctrl-V` in a chat pastes the MacBook's clipboard image, like a
   screenshot or an image file copied in Finder: Hammerspoon, from `setup-macbook.sh`, sends it to
   `/tmp/agent-clipboard` on the mini and pastes its path, which Claude attaches. It goes by the tab title
-  `agent@mini: …`, or `<you>@mini:…` in `mini-admin`'s shell; images there go after a day.
+  `agent@mini: …`, or `<you>@mini:…` in `mini-admin`; images there go after a day. By the same title, `Cmd-C`
+  copies the selection of tmux or Claude there.
 - **Phone:** with Tailscale on, tap the host `mini` in Termius, and leave its Startup Command empty: the mini opens
   the view itself. In Android's settings for Termius, turn off battery optimization, or Android may drop the
   connection when you switch apps. On a shaky connection, turn on **Use Mosh** in the host's settings: the session can

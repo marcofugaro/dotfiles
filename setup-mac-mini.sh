@@ -62,6 +62,36 @@ as_agent() {
   (cd / && sudo -H -u agent "$@")
 }
 
+# Claude Code preferences kept in ~/.claude.json rather than settings.json, written under Claude's own lock: a
+# selection is copied with Cmd-C, not on select. For you, or for agent with: claude_prefs as_agent
+claude_prefs() {
+  "$@" python3 -I - <<'PY'
+import json, os, time
+
+path = os.path.expanduser('~/.claude.json')
+lock = path + '.lock'
+for _ in range(30):
+    try:
+        os.mkdir(lock)
+        break
+    except FileExistsError:
+        time.sleep(0.1)
+else:
+    raise SystemExit(f'{path} stayed locked, so Claude still copies on select')
+
+try:
+    config = json.load(open(path)) if os.path.exists(path) else {}
+    if config.get('copyOnSelect') is not False:
+        config['copyOnSelect'] = False
+        temp = f'{path}.{os.getpid()}.tmp'
+        with open(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        os.replace(temp, path)
+finally:
+    os.rmdir(lock)
+PY
+}
+
 # Blender Lab's MCP server for agent's Claude, with its add-on in agent's Blender, which runs in the background
 # since the mini has no screen. Each Blender version keeps its own settings and add-ons, so --update copies and
 # installs them again
@@ -263,6 +293,9 @@ mini_host="$(tailnet_host)"
 claude_md="$(cat CLAUDE.md; echo; sed "s/mini\.<tailnet>\.ts\.net/$mini_host/" CLAUDE-mac-mini.md)"
 printf "%s\n" "$claude_md" > ~/.claude/CLAUDE.md
 
+# Cmd-C copies a selection, as in tmux
+claude_prefs
+
 
 section "Your tmux"
 
@@ -276,15 +309,21 @@ xterm_mosh='xterm-mosh|xterm-256color for tmux under Mosh, use=xterm-256color,'
 tmux_selection() {
   cat <<'EOF'
 
-# The mouse selects as in a terminal without tmux: the selection and the view stay put, and the text reaches the
-# device's clipboard on release, so Cmd-C finds it there. A double-click selects a word, a triple-click a line. These
-# change copy mode's emacs keys, which tmux would swap for vi's when $EDITOR mentions vi
+# The mouse selects as in a terminal without tmux: the selection and the view stay put, and nothing is copied until
+# Cmd-C. A double-click selects a word, a triple-click a line. These change copy mode's emacs keys, which tmux would
+# swap for vi's when $EDITOR mentions vi
 set -g mode-keys emacs
-bind -T copy-mode MouseDragEnd1Pane send -X copy-pipe-no-clear
-bind -T copy-mode DoubleClick1Pane select-pane \; send -X select-word \; send -X copy-pipe-no-clear
-bind -T copy-mode TripleClick1Pane select-pane \; send -X select-line \; send -X copy-pipe-no-clear
-bind -T root DoubleClick1Pane select-pane -t = \; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H ; send -X select-word ; send -X copy-pipe-no-clear }
-bind -T root TripleClick1Pane select-pane -t = \; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H ; send -X select-line ; send -X copy-pipe-no-clear }
+unbind -T copy-mode MouseDragEnd1Pane
+bind -T copy-mode DoubleClick1Pane select-pane \; send -X select-word
+bind -T copy-mode TripleClick1Pane select-pane \; send -X select-line
+bind -T root DoubleClick1Pane select-pane -t = \; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H ; send -X select-word }
+bind -T root TripleClick1Pane select-pane -t = \; if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -H ; send -X select-line }
+
+# Cmd-C, which Hammerspoon sends from Tabby as Ctrl-Option-Shift-F12, copies tmux's selection to the device's clipboard
+# and keeps it. A program that takes the mouse, like Claude, gets it as kitty's keyboard protocol sends Cmd-C, which
+# Claude copies its own selection with
+bind -T copy-mode C-M-S-F12 send -X copy-pipe-no-clear
+bind -n C-M-S-F12 if -F '#{mouse_any_flag}' { set-buffer -b cmd-c "\e[99;9u" ; paste-buffer -S -d -b cmd-c }
 
 # tmux sends its own copies to the device as OSC 52 with no selection, which Mosh drops: it passes only 52;c;. This
 # adds the c when it's missing. A view picks it up when it connects
@@ -326,9 +365,10 @@ set -s set-clipboard on
 # the default color, so dim text right after colored dim text is gray too
 set -s 'terminal-overrides[1]' 'xterm-mosh:dim=\E[38;5;244m:AX@'
 
-# The terminal's tab title is the one the shell sets, like marcofugaro@mini:~/Code/dotfiles
+# The terminal's tab title is the one the shell sets, like marcofugaro@mini:~/Code/dotfiles. Another program's, like
+# Claude's, gets user@host in front, which Hammerspoon on the MacBook goes by
 set -g set-titles on
-set -g set-titles-string '#T'
+set -g set-titles-string '#{?#{m:#{user}@*,#T},#T,#{user}@#{host_short}: #T}'
 EOF
 tmux_selection >> ~/.tmux.conf
 
@@ -546,7 +586,7 @@ for dir in ~/Code/*(/N); do
 done
 EOF
 
-# Claude Code settings, adding the ones missing and keeping what's set, and instructions
+# Claude Code settings, adding the ones missing and keeping what's set, instructions and preferences
 as_agent mkdir -p /Users/agent/.claude
 as_agent python3 -I - <<'PY'
 import json, os
@@ -582,6 +622,7 @@ with open(path, 'w') as f:
     f.write('\n')
 PY
 printf "%s\n" "$claude_md" | as_agent tee /Users/agent/.claude/CLAUDE.md > /dev/null
+claude_prefs as_agent
 
 
 section "Blender MCP"
